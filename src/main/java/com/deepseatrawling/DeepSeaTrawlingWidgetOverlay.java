@@ -1,6 +1,7 @@
 package com.deepseatrawling;
 
 import net.runelite.api.Client;
+import net.runelite.api.Player;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.Notifier;
 import net.runelite.client.ui.FontManager;
@@ -46,12 +47,17 @@ public class DeepSeaTrawlingWidgetOverlay extends Overlay {
         setLayer(OverlayLayer.ABOVE_WIDGETS);
     }
 
+    private Integer getPlayerBoatType() {
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer == null || localPlayer.getWorldView() == null) return null;
+        return plugin.boats.get(localPlayer.getWorldView().getId());
+    }
+
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        int playerBoat;
-        if (plugin.boats.get(client.getLocalPlayer().getWorldView().getId()) != null) {
-            playerBoat = plugin.boats.get(client.getLocalPlayer().getWorldView().getId());
+        Integer playerBoat = getPlayerBoatType();
+        if (playerBoat != null) {
             if (config.showNetDepthText()) {
                 if (playerBoat == SKIFF_WORLDVIEW_ID) {
                     drawNetDepthLetter(graphics, 0);
@@ -92,10 +98,8 @@ public class DeepSeaTrawlingWidgetOverlay extends Overlay {
         Widget parent = client.getWidget(SAILING_SIDEPANEL_GROUP , FACILITIES_CONTENT_CLICKLAYER_CHILD);
         if (parent == null) return;
 
-        if (plugin.boats.get(client.getLocalPlayer().getWorldView().getId()) == null) {
-            return;
-        }
-        int shipType = plugin.boats.get(client.getLocalPlayer().getWorldView().getId());
+        Integer shipType = getPlayerBoatType();
+        if (shipType == null) return;
 
         int childId = -1;
         if (netIndex == 0) {
@@ -138,10 +142,8 @@ public class DeepSeaTrawlingWidgetOverlay extends Overlay {
         Widget parent = client.getWidget(SAILING_SIDEPANEL_GROUP , FACILITIES_CONTENT_CLICKLAYER_CHILD);
         if (parent == null) return;
 
-        if (plugin.boats.get(client.getLocalPlayer().getWorldView().getId()) == null) {
-            return;
-        }
-        int shipType = plugin.boats.get(client.getLocalPlayer().getWorldView().getId());
+        Integer shipType = getPlayerBoatType();
+        if (shipType == null) return;
 
         if (shipType == SLOOP_WORLDVIEW_ID) {
             downId = (netIndex == 0) ? STARBOARD_DOWN_INDEX : PORT_DOWN_INDEX;

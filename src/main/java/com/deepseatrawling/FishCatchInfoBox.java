@@ -50,7 +50,7 @@ public class FishCatchInfoBox extends InfoBox {
     @Override
     public String getTooltip()
     {
-        return fishName + ": " + count;
+        return "total " + fishName + ": " + count;
     }
 
     @Override

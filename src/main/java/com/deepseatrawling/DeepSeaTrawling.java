@@ -1,5 +1,7 @@
 package com.deepseatrawling;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import net.runelite.client.util.ImageUtil;
 import javax.inject.Inject;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.List;
 
@@ -35,6 +38,15 @@ import java.util.List;
 )
 public class DeepSeaTrawling extends Plugin
 {
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private Gson gson;
+
+	private static final String CONFIG_GROUP = "deepseatrawling";
+	private static final String FISH_COUNTS_KEY = "fishCounts";
+
 	@Inject
 	private Client client;
 
@@ -69,6 +81,7 @@ public class DeepSeaTrawling extends Plugin
     private int lastNotifiedDepth = -1;
 
 	private TrawlingNetInfoBox trawlingNetInfoBox;
+    private boolean wasOnBoat = false;
     private final Map<String, FishCatchInfoBox> fishCatchInfoBoxes = new HashMap<>();
 
 
@@ -196,7 +209,7 @@ public class DeepSeaTrawling extends Plugin
 
 		int id = obj.getId();
 
-		if (client.getLocalPlayer().getWorldView() != null && obj.getWorldView() != null && client.getLocalPlayer().getWorldView() == obj.getWorldView())
+		if (client.getLocalPlayer() != null && client.getLocalPlayer().getWorldView() != null && obj.getWorldView() != null && client.getLocalPlayer().getWorldView() == obj.getWorldView())
 		{
 			if (isStarboardNetObject(id)) {
 				netObjectByIndex[0] = obj;
@@ -289,12 +302,22 @@ public class DeepSeaTrawling extends Plugin
         GameState state = e.getGameState();
         if (state == GameState.HOPPING || state == GameState.LOGGING_IN) {
             fishQuantity = 0;
+            wasOnBoat = false;
+            for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+                infoBoxManager.removeInfoBox(infoBox);
+            }
+            fishCatchInfoBoxes.clear();
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
                 nearestShoal.setLast(null);
             }
         }
+    }
+
+    @Subscribe
+    public void onAccountHashChanged(AccountHashChanged e) {
+        loadFishCounts();
     }
 
     @Subscribe
@@ -389,7 +412,9 @@ public class DeepSeaTrawling extends Plugin
 	{
 		ChatMessageType type = event.getType();
 
-        if (!boats.containsKey(client.getLocalPlayer().getWorldView().getId())) return;
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer == null || localPlayer.getWorldView() == null) return;
+        if (!boats.containsKey(localPlayer.getWorldView().getId())) return;
 
 		if (type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM)
 		{
@@ -399,22 +424,15 @@ public class DeepSeaTrawling extends Plugin
                 fishQuantity = 0;
                 log.debug("Emptied nets");
                 notifiedFull = false;
+                saveFishCounts();
             } else if (msg.equals("You take some fish from the net")) {
                 log.debug("Unknown amount withdrawn from net, resetting to 0");
                 fishQuantity = 0;
                 notifiedFull = false;
+                saveFishCounts();
             }
 
-            if (msg.startsWith("You disembark")) {
-				log.debug("Disembarked from boat - clearing fish counts");
-				for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
-					infoBox.resetCount();
-					infoBoxManager.removeInfoBox(infoBox);
-				}
-				fishCatchInfoBoxes.clear();
-			}
-
-			if (msg.contains("Trawler's trust")) {
+            if (msg.contains("Trawler's trust")) {
 				// Another message includes the additional fish caught
 				return;
 			}
@@ -482,7 +500,20 @@ public class DeepSeaTrawling extends Plugin
 
 		switch (changed)
 		{
-
+			case VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT:
+				if (e.getValue() == 1) {
+					wasOnBoat = true; // Track this to avoid wipes during login state change
+				} else if (e.getValue() == 0 && wasOnBoat) {
+					wasOnBoat = false; 
+					log.debug("Disembarked from boat - clearing fish counts");
+					for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+						infoBox.resetCount();
+						infoBoxManager.removeInfoBox(infoBox);
+					}
+					fishCatchInfoBoxes.clear();
+					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+				}
+				break;
 			case VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_DEPTH:
 				netList[0].setNetDepth(e.getValue());
 				break;
@@ -684,6 +715,45 @@ public class DeepSeaTrawling extends Plugin
 	public Map<String, FishCatchInfoBox> getFishCatchInfoBoxes() {
 		return fishCatchInfoBoxes;
 	}
+
+    private void saveFishCounts() {
+        Map<String, Integer> counts = new HashMap<>();
+        for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
+            counts.put(entry.getKey(), entry.getValue().getCount());
+        }
+        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY, gson.toJson(counts));
+        log.debug("Saved fish counts: {}", counts);
+    }
+
+    private void loadFishCounts() {
+        String json = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+        if (json == null) return;
+
+        Type type = new TypeToken<Map<String, Integer>>(){}.getType();
+        Map<String, Integer> counts = gson.fromJson(json, type);
+        if (counts == null) return;
+
+        // Clear any existing boxes before loading to avoid duplicates getting created
+        for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+            infoBoxManager.removeInfoBox(infoBox);
+        }
+        fishCatchInfoBoxes.clear();
+
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            String fishName = entry.getKey();
+            int count = entry.getValue();
+            if (count <= 0) continue;
+
+            BufferedImage icon = getFishIcon(fishName);
+            if (icon == null) continue;
+
+            FishCatchInfoBox infoBox = new FishCatchInfoBox(icon, this, config, fishName);
+            infoBox.incrementCount(count);
+            fishCatchInfoBoxes.put(fishName, infoBox);
+            infoBoxManager.addInfoBox(infoBox);
+        }
+        log.debug("Loaded fish counts: {}", counts);
+    }
 
     private void updateNearestShoalSticky() {
         if (activeShoals.size() == 1) {
