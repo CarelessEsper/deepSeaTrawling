@@ -223,6 +223,15 @@ public interface DeepSeaTrawlingConfig extends Config
             section = netsSection
     )
     default boolean infoboxIsEnabled() { return true; }
+    
+    @ConfigItem(
+            keyName = "infoboxFishTypeEnabled",
+            name = "Show fish caught during trip",
+            description = "Show infoboxes with the amount of each fish caught by yourself or crewmates",
+            position = 7,
+            section = netsSection
+    )
+    default boolean infoboxFishTypeEnabled() { return false; }
 
     // ---------- Notifications ----------
     @ConfigItem(

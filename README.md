@@ -39,7 +39,8 @@ The Deep Sea Trawling plugin is a RuneLite plugin that helps make the Deep Sea T
   - Toggle the rounded net depth text in the UI
   - Toggle highlighting the UI buttons for raising/lowering your nets when they are at incorrect depth
   - Toggle the text box above each shoal that shows which depth it is currently at
-  - Toggle for the info box that displays how many fish you have in your nets\
+  - Toggle for the info box that displays how many fish you have in your nets
+  - Toggle for the info boxes that display how many of each type of fish you have caught during the trip\
 ![](assets/NetsConfig.png)
 
 - **Notification config:** Config settings for the notifications:

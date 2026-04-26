@@ -15,17 +15,18 @@ public class ShoalData {
 
     public enum ShoalSpecies
     {
-        GIANT_KRILL (ObjectID.SAILING_SHOAL_CLICKBOX_GIANT_KRILL),
-        HADDOCK (ObjectID.SAILING_SHOAL_CLICKBOX_HADDOCK),
-        YELLOWFIN (ObjectID.SAILING_SHOAL_CLICKBOX_YELLOWFIN),
-        HALIBUT (ObjectID.SAILING_SHOAL_CLICKBOX_HALIBUT),
-        BLUEFIN (ObjectID.SAILING_SHOAL_CLICKBOX_BLUEFIN),
-        MARLIN (ObjectID.SAILING_SHOAL_CLICKBOX_MARLIN),
-        SHIMMERING (ObjectID.SAILING_SHOAL_CLICKBOX_SHIMMERING),
-        GLISTENING (ObjectID.SAILING_SHOAL_CLICKBOX_GLISTENING),
-        VIBRANT (ObjectID.SAILING_SHOAL_CLICKBOX_VIBRANT);
+        GIANT_KRILL (ObjectID.SAILING_SHOAL_CLICKBOX_GIANT_KRILL, 32309),
+        HADDOCK (ObjectID.SAILING_SHOAL_CLICKBOX_HADDOCK, 32317),
+        YELLOWFIN (ObjectID.SAILING_SHOAL_CLICKBOX_YELLOWFIN, 32325),
+        HALIBUT (ObjectID.SAILING_SHOAL_CLICKBOX_HALIBUT, 32333),
+        BLUEFIN (ObjectID.SAILING_SHOAL_CLICKBOX_BLUEFIN, 32341),
+        MARLIN (ObjectID.SAILING_SHOAL_CLICKBOX_MARLIN, 32349),
+        SHIMMERING (ObjectID.SAILING_SHOAL_CLICKBOX_SHIMMERING, -1),
+        GLISTENING (ObjectID.SAILING_SHOAL_CLICKBOX_GLISTENING, -1),
+        VIBRANT (ObjectID.SAILING_SHOAL_CLICKBOX_VIBRANT, -1);
 
         private final int objectID;
+        private final int itemID;
 
         public ShoalDepth defaultDepth()
         {
@@ -40,8 +41,13 @@ public class ShoalData {
             }
         }
 
-        ShoalSpecies(int objectID) {
+        ShoalSpecies(int objectID, int itemID) {
             this.objectID = objectID;
+            this.itemID = itemID;
+        }
+
+        public int getItemID() {
+            return itemID;
         }
 
         public static ShoalSpecies fromGameObjectId(int id)
@@ -51,6 +57,25 @@ public class ShoalData {
                 if (s.objectID == id) {
                     return s;
                 }
+            }
+            return null;
+        }
+
+        public static ShoalSpecies fromFishName(String fishName)
+        {
+            String normalized = fishName.toLowerCase();
+            if (normalized.contains("krill")) {
+                return GIANT_KRILL;
+            } else if (normalized.contains("haddock")) {
+                return HADDOCK;
+            } else if (normalized.contains("yellowfin")) {
+                return YELLOWFIN;
+            } else if (normalized.contains("halibut")) {
+                return HALIBUT;
+            } else if (normalized.contains("bluefin")) {
+                return BLUEFIN;
+            } else if (normalized.contains("marlin")) {
+                return MARLIN;
             }
             return null;
         }

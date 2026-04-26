@@ -1,5 +1,10 @@
 package com.deepseatrawling;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatCommandManager;
+import net.runelite.client.chat.ChatMessageBuilder;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -17,13 +22,13 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
-import net.runelite.api.ChatMessageType;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.List;
 
@@ -37,7 +42,21 @@ import java.util.List;
 public class DeepSeaTrawling extends Plugin
 {
 	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private Gson gson;
+
+	private static final String CONFIG_GROUP = "deepseatrawling";
+	private static final String FISH_COUNTS_KEY = "fishCounts";
+
+	@Inject
 	private Client client;
+
+	@Inject
+	private ChatCommandManager chatCommandManager;
+
+	private static final String CAUGHT_COMMAND = "!caught";
 
 	@Inject
 	private DeepSeaTrawlingConfig config;
@@ -57,6 +76,9 @@ public class DeepSeaTrawling extends Plugin
 	@Inject
 	private InfoBoxManager infoBoxManager;
 
+	@Inject
+	private net.runelite.client.game.ItemManager itemManager;
+
     @Inject
     ShoalRouteRegistry shoalRouteRegistry;
 
@@ -67,6 +89,9 @@ public class DeepSeaTrawling extends Plugin
     private int lastNotifiedDepth = -1;
 
 	private TrawlingNetInfoBox trawlingNetInfoBox;
+    private boolean wasOnBoat = false;
+    private final Map<String, FishCatchInfoBox> fishCatchInfoBoxes = new HashMap<>();
+
 
 	public final Set<Integer> trackedShoals = new HashSet<>();
 
@@ -101,7 +126,7 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.add(widgetOverlay);
 		overlayManager.add(trawlingNetOverlay);
 
-		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
+		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/deepseatrawling_icon.png");
 		trawlingNetInfoBox = new TrawlingNetInfoBox(icon, this, config);
 		infoBoxManager.addInfoBox(trawlingNetInfoBox);
 
@@ -111,7 +136,12 @@ public class DeepSeaTrawling extends Plugin
 
         shoalRouteRegistry.load();
 
+        if (client.getGameState() == GameState.LOGGED_IN) {
+            loadFishCounts();
+        }
+
 		log.info("Deep Sea Trawling Plugin Started");
+		chatCommandManager.registerCommandAsync(CAUGHT_COMMAND, this::onCaughtCommand);
 
 	}
 
@@ -125,11 +155,16 @@ public class DeepSeaTrawling extends Plugin
 			infoBoxManager.removeInfoBox(trawlingNetInfoBox);
 			trawlingNetInfoBox = null;
 		}
+        for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+			infoBoxManager.removeInfoBox(infoBox);
+		}
+		fishCatchInfoBoxes.clear();
 		trackedShoals.clear();
 		netObjectByIndex[0] = null;
 		netObjectByIndex[1] = null;
         activeShoals.clear();
         nearestShoal = null;
+		chatCommandManager.unregisterCommand(CAUGHT_COMMAND);
 		log.info("Deep Sea Trawling Plugin Stopped");
 	}
 
@@ -188,7 +223,7 @@ public class DeepSeaTrawling extends Plugin
 
 		int id = obj.getId();
 
-		if (client.getLocalPlayer().getWorldView() != null && obj.getWorldView() != null && client.getLocalPlayer().getWorldView() == obj.getWorldView())
+		if (client.getLocalPlayer() != null && client.getLocalPlayer().getWorldView() != null && obj.getWorldView() != null && client.getLocalPlayer().getWorldView() == obj.getWorldView())
 		{
 			if (isStarboardNetObject(id)) {
 				netObjectByIndex[0] = obj;
@@ -281,12 +316,22 @@ public class DeepSeaTrawling extends Plugin
         GameState state = e.getGameState();
         if (state == GameState.HOPPING || state == GameState.LOGGING_IN) {
             fishQuantity = 0;
+            wasOnBoat = false;
+            for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+                infoBoxManager.removeInfoBox(infoBox);
+            }
+            fishCatchInfoBoxes.clear();
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
                 nearestShoal.setLast(null);
             }
         }
+    }
+
+    @Subscribe
+    public void onAccountHashChanged(AccountHashChanged e) {
+        loadFishCounts();
     }
 
     @Subscribe
@@ -381,7 +426,9 @@ public class DeepSeaTrawling extends Plugin
 	{
 		ChatMessageType type = event.getType();
 
-        if (!boats.containsKey(client.getLocalPlayer().getWorldView().getId())) return;
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer == null || localPlayer.getWorldView() == null) return;
+        if (!boats.containsKey(localPlayer.getWorldView().getId())) return;
 
 		if (type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM)
 		{
@@ -391,39 +438,66 @@ public class DeepSeaTrawling extends Plugin
                 fishQuantity = 0;
                 log.debug("Emptied nets");
                 notifiedFull = false;
+                saveFishCounts();
             } else if (msg.equals("You take some fish from the net")) {
                 log.debug("Unknown amount withdrawn from net, resetting to 0");
                 fishQuantity = 0;
                 notifiedFull = false;
+                saveFishCounts();
             }
 
-			if (msg.contains("Trawler's trust")) {
+            if (msg.contains("Trawler's trust")) {
 				// Another message includes the additional fish caught
 				return;
 			}
 
-			String substring = "";
+			String quantityStr = "";
+			String fishName = "";
+			int startIndex = -1;
 			if (msg.contains("You catch "))
 			{
-				int index = "You catch ".length();
-				substring = msg.substring(index, msg.indexOf(" ", index + 1));
+				startIndex = "You catch ".length();
 			} else if (msg.contains(" catches ")) {
-				int index = msg.indexOf(" catches ") + " catches ".length();
-				substring = msg.substring(index, msg.indexOf(" ", index + 1));
-                log.debug("fish caught! = {}", substring);
-            }
+				startIndex = msg.indexOf(" catches ") + " catches ".length();
+			}
+			
+			// Parse quantity and fish name if valid pattern is found
+			if (startIndex != -1) {
+				int spaceIndex = msg.indexOf(" ", startIndex + 1);
+				if (spaceIndex == -1) {
+					log.debug("Could not find space after quantity in message: '{}'", msg);
+				} else {
+					quantityStr = msg.substring(startIndex, spaceIndex);
+					
+					// Extract fish name (everything after the quantity until the exclamation point)
+					int exclamIndex = msg.indexOf("!", spaceIndex);
+					if (exclamIndex > 0) {
+						fishName = msg.substring(spaceIndex + 1, exclamIndex).trim();
+					} else {
+						fishName = msg.substring(spaceIndex + 1).trim();
+					}
+				}
+			}
 
-			if (!substring.isEmpty())
+			if (!quantityStr.isEmpty())
 			{
                 int totalNetSize = 0;
-                for (int i = 0; i < 2; i++) {
-                    if (netObjectByIndex[i] != null)
-                    {
-                        totalNetSize += netList[i].getNetSize();
-                    }
+                if (netList[0] != null)
+                {
+                    totalNetSize += netList[0].getNetSize();
+                }
+                if (netList[1] != null)
+                {
+                    totalNetSize += netList[1].getNetSize();
                 }
                 if (totalNetSize > 0) {
-                    fishQuantity += convertToNumber(substring);
+                    int amount = convertToNumber(quantityStr);
+					fishQuantity += amount;
+
+					// Track individual fish types
+					if (!fishName.isEmpty()) {
+						trackFishCatch(toTitleCase(fishName), amount);
+					}
                 }
                 if (fishQuantity >= totalNetSize && config.notifyNetFull() && !notifiedFull) {
                     notifier.notify("Trawling net(s) full! Empty now!");
@@ -440,7 +514,20 @@ public class DeepSeaTrawling extends Plugin
 
 		switch (changed)
 		{
-
+			case VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT:
+				if (e.getValue() == 1) {
+					wasOnBoat = true; // Track this to avoid wipes during login state change
+				} else if (e.getValue() == 0 && wasOnBoat) {
+					wasOnBoat = false; 
+					log.debug("Disembarked from boat - clearing fish counts");
+					for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+						infoBox.resetCount();
+						infoBoxManager.removeInfoBox(infoBox);
+					}
+					fishCatchInfoBoxes.clear();
+					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+				}
+				break;
 			case VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_DEPTH:
 				netList[0].setNetDepth(e.getValue());
 				break;
@@ -611,6 +698,111 @@ public class DeepSeaTrawling extends Plugin
             }
         }
         return false;
+    }
+
+    private void trackFishCatch(String fishName, int amount) {
+		FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(fishName);
+		if (infoBox == null) {
+			BufferedImage icon = getFishIcon(fishName);
+			if (icon == null) {
+				log.debug("No icon available for '{}', skipping infobox creation", fishName);
+				return;
+			}
+			infoBox = new FishCatchInfoBox(icon, this, config, fishName);
+			fishCatchInfoBoxes.put(fishName, infoBox);
+			infoBoxManager.addInfoBox(infoBox);
+		}
+		
+		infoBox.incrementCount(amount);
+	}
+
+    private BufferedImage getFishIcon(String fishName) {
+		ShoalData.ShoalSpecies species = ShoalData.ShoalSpecies.fromFishName(fishName);
+		log.debug("getFishIcon for '{}': species={}", fishName, species);
+		if (species != null && species.getItemID() > 0) {
+			BufferedImage img = itemManager.getImage(species.getItemID());
+			return img;
+		}
+		return null;
+	}
+
+	public Map<String, FishCatchInfoBox> getFishCatchInfoBoxes() {
+		return fishCatchInfoBoxes;
+	}
+
+    private void onCaughtCommand(ChatMessage chatMessage, String message)
+    {
+        if (fishCatchInfoBoxes.isEmpty()) return;
+
+        ChatMessageBuilder builder = new ChatMessageBuilder();
+        boolean first = true;
+        for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
+            int count = entry.getValue().getCount();
+            if (count <= 0) continue;
+            if (!first) builder.append(ChatColorType.NORMAL).append(", ");
+            builder.append(ChatColorType.HIGHLIGHT).append(entry.getKey())
+                    .append(ChatColorType.NORMAL).append(" caught: ")
+                    .append(ChatColorType.HIGHLIGHT).append(String.format("%,d", count));
+            first = false;
+        }
+        if (first) return;
+
+        String response = builder.build();
+        chatMessage.setMessage(response);
+        chatMessage.getMessageNode().setRuneLiteFormatMessage(response);
+        client.refreshChat();
+    }
+
+    private static String toTitleCase(String input) {
+        if (input == null || input.isEmpty()) return input;
+        String[] words = input.split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1).toLowerCase());
+            }
+        }
+        return sb.toString();
+    }
+
+    private void saveFishCounts() {
+        Map<String, Integer> counts = new HashMap<>();
+        for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
+            counts.put(entry.getKey(), entry.getValue().getCount());
+        }
+        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY, gson.toJson(counts));
+        log.debug("Saved fish counts: {}", counts);
+    }
+
+    private void loadFishCounts() {
+        String json = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+        if (json == null) return;
+
+        Type type = new TypeToken<Map<String, Integer>>(){}.getType();
+        Map<String, Integer> counts = gson.fromJson(json, type);
+        if (counts == null) return;
+
+        // Clear any existing boxes before loading to avoid duplicates getting created
+        for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
+            infoBoxManager.removeInfoBox(infoBox);
+        }
+        fishCatchInfoBoxes.clear();
+
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            String fishName = entry.getKey();
+            int count = entry.getValue();
+            if (count <= 0) continue;
+
+            BufferedImage icon = getFishIcon(fishName);
+            if (icon == null) continue;
+
+            FishCatchInfoBox infoBox = new FishCatchInfoBox(icon, this, config, fishName);
+            infoBox.incrementCount(count);
+            fishCatchInfoBoxes.put(fishName, infoBox);
+            infoBoxManager.addInfoBox(infoBox);
+        }
+        log.debug("Loaded fish counts: {}", counts);
     }
 
     private void updateNearestShoalSticky() {
