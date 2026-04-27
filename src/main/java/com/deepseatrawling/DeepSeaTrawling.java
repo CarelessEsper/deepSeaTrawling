@@ -104,6 +104,10 @@ public class DeepSeaTrawling extends Plugin
 
     private final Map<Integer, ShoalData> activeShoals = new HashMap<>();
 
+    public ShoalData getActiveShoal(int worldViewId) {
+        return activeShoals.get(worldViewId);
+    }
+
     public Map<ShoalData.ShoalSpecies, Color> speciesColours = new EnumMap<>(ShoalData.ShoalSpecies.class);
 
     @Provides
