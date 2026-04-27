@@ -1,5 +1,6 @@
 package com.deepseatrawling;
 
+import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -286,6 +287,7 @@ public interface DeepSeaTrawlingConfig extends Config
     default Notification notifyShoalMoving() { return Notification.ON; }
 
     // -------------- Colours ---------------------
+    @Alpha
     @ConfigItem(
             keyName = "fishCounterTextColour",
             name = "Fish counter text colour",
@@ -295,6 +297,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color fishCounterTextColour() { return Color.GRAY; }
 
+    @Alpha
     @ConfigItem(
             keyName = "uiHighlightColour",
             name = "Highlight UI Button Colour",
@@ -304,6 +307,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color uiHighlightColour() { return new Color(255, 255, 0); }
 
+    @Alpha
     @ConfigItem(
             keyName = "netDepthHighlightColour",
             name = "Wrong Net Depth highlight colour",
@@ -313,6 +317,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color netDepthHighlightColour() { return new Color(255, 255, 0, 220); }
 
+    @Alpha
     @ConfigItem(
             keyName = "netFullHighlightColour",
             name = "Net Full highlight colour",
@@ -322,6 +327,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color netFullHighlightColour() { return Color.RED; }
 
+    @Alpha
     @ConfigItem(
             keyName = "shoalPathColour",
             name = "Regular Shoal path solid colour",
@@ -331,6 +337,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color shoalPathColour() { return new Color(0,51,102); }
 
+    @Alpha
     @ConfigItem(
             keyName = "specialPathColour",
             name = "Special Shoal path solid colour",
@@ -340,6 +347,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color specialPathColour() { return new Color(0,204,255); }
 
+    @Alpha
     @ConfigItem(
             keyName = "giantKrillColour",
             name = "Giant Krill Colour",
@@ -349,6 +357,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color giantKrillColour() { return new Color(255, 150, 150); }
 
+    @Alpha
     @ConfigItem(
             keyName = "haddockColour",
             name = "Haddock Colour",
@@ -358,6 +367,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color haddockColour() { return new Color(255, 255, 200); }
 
+    @Alpha
     @ConfigItem(
             keyName = "shimmeringColour",
             name = "Shimmering Colour",
@@ -367,6 +377,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color shimmeringColour() { return new Color(200, 255, 255); }
 
+    @Alpha
     @ConfigItem(
             keyName = "yellowfinColour",
             name = "Yellowfin Colour",
@@ -376,6 +387,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color yellowfinColour() { return new Color(255, 220, 120); }
 
+    @Alpha
     @ConfigItem(
             keyName = "halibutColour",
             name = "Halibut Colour",
@@ -385,6 +397,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color halibutColour() { return new Color(200, 255, 200); }
 
+    @Alpha
     @ConfigItem(
             keyName = "glisteningColour",
             name = "Glistening Colour",
@@ -394,6 +407,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color glisteningColour() { return new Color(220, 200, 255); }
 
+    @Alpha
     @ConfigItem(
             keyName = "bluefinColour",
             name = "Bluefin Colour",
@@ -403,6 +417,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color bluefinColour() { return new Color(120, 180, 255); }
 
+    @Alpha
     @ConfigItem(
             keyName = "marlinColour",
             name = "Marlin Colour",
@@ -412,6 +427,7 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Color marlinColour() { return new Color(0, 200, 255); }
 
+    @Alpha
     @ConfigItem(
             keyName = "vibrantColour",
             name = "Vibrant Colour",
