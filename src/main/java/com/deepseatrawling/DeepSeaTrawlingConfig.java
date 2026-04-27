@@ -235,29 +235,52 @@ public interface DeepSeaTrawlingConfig extends Config
     default boolean infoboxFishTypeEnabled() { return false; }
 
     // ---------- Notifications ----------
+    enum NotifyGuard
+    {
+        ALWAYS("Always"),
+        ON_BOAT("While on a boat"),
+        NET_PRESENT("Boat has trawling nets"),
+        NET_DEPLOYED("Trawling net(s) are active");
+
+        private final String name;
+        NotifyGuard(String name) { this.name = name; }
+
+        @Override
+        public String toString() { return name; }
+    }
+
+    @ConfigItem(
+            keyName = "notifyGuard",
+            name = "Notification conditions",
+            description = "Controls when trawling notifications are allowed to fire (respecting per-notification settings)",
+            position = 0,
+            section = notifSection
+    )
+    default NotifyGuard notifyGuard() { return NotifyGuard.NET_PRESENT; }
+
     @ConfigItem(
             keyName = "notifyNetFull",
             name = "Notify when net is full",
             description = "Shows a RuneLite notification when your nets are full",
-            position = 0,
+            position = 1,
             section = notifSection
     )
     default Notification notifyNetFull() { return Notification.ON; }
 
     @ConfigItem(
             keyName = "notifyDepthChange",
-            name = "Notify when depth change (on screen)",
+            name = "Notify when shoal depth changes",
             description = "Shows a RuneLite notification when the rendered shoal's depth changes",
-            position = 1,
+            position = 2,
             section = notifSection
     )
     default Notification notifyDepthChange() { return Notification.ON; }
 
     @ConfigItem(
             keyName = "notifyShoalMoving",
-            name = "Notify when shoal moves (on screen)",
+            name = "Notify when shoal moves on screen",
             description = "Shows a RuneLite notification when the rendered shoal begins moving",
-            position = 2,
+            position = 3,
             section  = notifSection
     )
     default Notification notifyShoalMoving() { return Notification.ON; }

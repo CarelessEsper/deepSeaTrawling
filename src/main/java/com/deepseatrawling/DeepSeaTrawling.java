@@ -500,7 +500,9 @@ public class DeepSeaTrawling extends Plugin
 					}
                 }
                 if (fishQuantity >= totalNetSize && !notifiedFull) {
-                    notifier.notify(config.notifyNetFull(), "Trawling net(s) full! Empty now!");
+                    if (isNotifyGuardPassed()) {
+                        notifier.notify(config.notifyNetFull(), "Trawling net(s) full! Empty now!");
+                    }
                     notifiedFull = true;
                 }
 			}
@@ -680,7 +682,9 @@ public class DeepSeaTrawling extends Plugin
 
         if (checkNetDepths(desiredDepth) && lastNotifiedDepth != desiredDepth) {
             lastNotifiedDepth = desiredDepth;
-            notifier.notify(config.notifyDepthChange(), "Shoal depth changed! Change net depth!");
+            if (isNotifyGuardPassed()) {
+                notifier.notify(config.notifyDepthChange(), "Shoal depth changed! Change net depth!");
+            }
         }
 
     }
@@ -697,6 +701,24 @@ public class DeepSeaTrawling extends Plugin
         }
         return false;
     }
+
+    public boolean isNotifyGuardPassed() {
+        switch (config.notifyGuard()) {
+            case ALWAYS:
+                return true;
+            case ON_BOAT:
+                return client.getVarbitValue(VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT) == 1;
+            case NET_PRESENT:
+                return client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID) > 0
+                    || client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID) > 0;
+            case NET_DEPLOYED:
+                return client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_DEPTH) > 0
+                    || client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_DEPTH) > 0;
+            default:
+                return true;
+        }
+    }
+
 
     private void trackFishCatch(String fishName, int amount) {
 		FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(fishName);
