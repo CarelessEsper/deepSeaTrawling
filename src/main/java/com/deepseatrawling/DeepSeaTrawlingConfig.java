@@ -4,6 +4,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Notification;
 
 import java.awt.*;
 
@@ -241,7 +242,7 @@ public interface DeepSeaTrawlingConfig extends Config
             position = 0,
             section = notifSection
     )
-    default boolean notifyNetFull() { return true; }
+    default Notification notifyNetFull() { return Notification.ON; }
 
     @ConfigItem(
             keyName = "notifyDepthChange",
@@ -250,7 +251,7 @@ public interface DeepSeaTrawlingConfig extends Config
             position = 1,
             section = notifSection
     )
-    default boolean notifyDepthChange() { return true; }
+    default Notification notifyDepthChange() { return Notification.ON; }
 
     @ConfigItem(
             keyName = "notifyShoalMoving",
@@ -259,7 +260,7 @@ public interface DeepSeaTrawlingConfig extends Config
             position = 2,
             section  = notifSection
     )
-    default boolean notifyShoalMoving() { return true; }
+    default Notification notifyShoalMoving() { return Notification.ON; }
 
     // -------------- Colours ---------------------
     @ConfigItem(

@@ -499,8 +499,8 @@ public class DeepSeaTrawling extends Plugin
 						trackFishCatch(toTitleCase(fishName), amount);
 					}
                 }
-                if (fishQuantity >= totalNetSize && config.notifyNetFull() && !notifiedFull) {
-                    notifier.notify("Trawling net(s) full! Empty now!");
+                if (fishQuantity >= totalNetSize && !notifiedFull) {
+                    notifier.notify(config.notifyNetFull(), "Trawling net(s) full! Empty now!");
                     notifiedFull = true;
                 }
 			}
@@ -680,9 +680,7 @@ public class DeepSeaTrawling extends Plugin
 
         if (checkNetDepths(desiredDepth) && lastNotifiedDepth != desiredDepth) {
             lastNotifiedDepth = desiredDepth;
-            if (config.notifyDepthChange()) {
-                notifier.notify("Shoal depth changed! Change net depth!");
-            }
+            notifier.notify(config.notifyDepthChange(), "Shoal depth changed! Change net depth!");
         }
 
     }

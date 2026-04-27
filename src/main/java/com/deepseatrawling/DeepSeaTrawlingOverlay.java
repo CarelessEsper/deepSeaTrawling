@@ -87,8 +87,8 @@ public class DeepSeaTrawlingOverlay extends Overlay {
 
             drawDepthLabel(graphics, shoal, size);
 
-            if (!shoal.hasActiveStopTimer() && !notifiedShoalMoving && config.notifyShoalMoving()) {
-                notifier.notify("Shoal is on the move! Set sail!");
+            if (!shoal.hasActiveStopTimer() && !notifiedShoalMoving) {
+                notifier.notify(config.notifyShoalMoving(), "Shoal is on the move! Set sail!");
                 notifiedShoalMoving = true;
             } else if (shoal.hasActiveStopTimer()){
                 notifiedShoalMoving = false;
