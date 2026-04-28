@@ -14,6 +14,7 @@ import net.runelite.api.coords.LocalPoint;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.awt.*;
 
 public class DeepSeaTrawlingOverlay extends Overlay {
@@ -44,55 +45,81 @@ public class DeepSeaTrawlingOverlay extends Overlay {
         {
             return null;
         }
+
+        // Draw routes from registry for any tracked shoal
+        for (Map.Entry<Integer, ShoalRoute> entry : plugin.shoalRouteRegistry.getRoutesByWorldViewId().entrySet())
+        {
+            int worldViewId = entry.getKey();
+            if (!plugin.trackedShoals.contains(worldViewId)) continue;
+
+            ShoalData active = plugin.getActiveShoal(worldViewId);
+            ShoalRoute route = entry.getValue();
+            ShoalData.ShoalSpecies species = ShoalTypes.fromIdToSpecies(worldViewId);
+            Color colour = plugin.speciesColours.getOrDefault(species, Color.WHITE);
+
+            Color pathColour;
+            if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID
+                    && species != null
+                    && (species == ShoalData.ShoalSpecies.SHIMMERING
+                        || species == ShoalData.ShoalSpecies.GLISTENING
+                        || species == ShoalData.ShoalSpecies.VIBRANT)) {
+                pathColour = config.specialPathColour();
+            } else if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID) {
+                pathColour = config.shoalPathColour();
+            } else {
+                pathColour = Color.WHITE;
+            }
+
+            drawPath(graphics, route.getPathPoints(), active, pathColour);
+
+            // Skip the shoal's current position if it's spawned, for stop squares 
+            WorldPoint currentWP = active != null ? active.getCurrentWorldPoint() : null;
+            drawStopSquares(graphics, route.getStopPoints(), currentWP, colour);
+        }
+
         ShoalData shoal = plugin.getNearestShoal();
         if (shoal == null) {
             return null;
         }
 
-        if(plugin.trackedShoals.contains(shoal.getWorldViewId())) {
-            Color baseColour = plugin.speciesColours.getOrDefault(shoal.getSpecies(), Color.WHITE);
+        if (!plugin.trackedShoals.contains(shoal.getWorldViewId())) {
+            return null;
+        }
 
-            if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID && (shoal.getSpecies() == ShoalData.ShoalSpecies.SHIMMERING || shoal.getSpecies() == ShoalData.ShoalSpecies.GLISTENING || shoal.getSpecies() == ShoalData.ShoalSpecies.VIBRANT))
-            {
-                drawPath(graphics, shoal, config.specialPathColour());
-            } else if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID) {
-                drawPath(graphics, shoal, config.shoalPathColour());
-            } else {
-                drawPath(graphics, shoal, Color.WHITE);
+        Color baseColour = plugin.speciesColours.getOrDefault(shoal.getSpecies(), Color.WHITE);
+
+        GameObject object = shoal.getShoalObject();
+        if (object == null)
+        {
+            return null;
+        }
+
+        LocalPoint localLocation = object.getLocalLocation();
+
+        ObjectComposition composition = client.getObjectDefinition(object.getId());
+        if (composition == null) {
+            return null;
+        }
+
+        int sizeX = composition.getSizeX();
+        int sizeY = composition.getSizeY();
+
+        int size = Math.max(sizeX, sizeY);
+        if (size <= 0) {
+            size = 1;
+        }
+
+        drawArea(graphics, localLocation, size, baseColour);
+
+        drawDepthLabel(graphics, shoal, size);
+
+        if (!shoal.hasActiveStopTimer() && !notifiedShoalMoving) {
+            if (plugin.isNotifyGuardPassed()) {
+                notifier.notify(config.notifyShoalMoving(), "Shoal is on the move! Set sail!");
             }
-            drawStopSquares(graphics, shoal, baseColour);
-
-            GameObject object = shoal.getShoalObject();
-            if (object == null)
-            {
-                return null;
-            }
-
-            LocalPoint localLocation = object.getLocalLocation();
-
-            ObjectComposition composition = client.getObjectDefinition(object.getId());
-            if (composition == null) {
-                return null;
-            }
-
-            int sizeX = composition.getSizeX();
-            int sizeY = composition.getSizeY();
-
-            int size = Math.max(sizeX, sizeY);
-            if (size <= 0) {
-                size = 1;
-            }
-
-            drawArea(graphics, localLocation, size, baseColour);
-
-            drawDepthLabel(graphics, shoal, size);
-
-            if (!shoal.hasActiveStopTimer() && !notifiedShoalMoving && config.notifyShoalMoving()) {
-                notifier.notify("Shoal is on the move! Set sail!");
-                notifiedShoalMoving = true;
-            } else if (shoal.hasActiveStopTimer()){
-                notifiedShoalMoving = false;
-            }
+            notifiedShoalMoving = true;
+        } else if (shoal.hasActiveStopTimer()){
+            notifiedShoalMoving = false;
         }
 
         return null;
@@ -117,9 +144,8 @@ public class DeepSeaTrawlingOverlay extends Overlay {
         graphics.setComposite(old);
     }
 
-    private void drawPath (Graphics2D path, ShoalData shoal, Color baseColour)
+    private void drawPath(Graphics2D path, List<WorldPoint> points, ShoalData activeShoal, Color baseColour)
     {
-        java.util.List<WorldPoint> points = shoal.getPathPoints();
         if (points.size() < 2) {
             return;
         }
@@ -129,7 +155,9 @@ public class DeepSeaTrawlingOverlay extends Overlay {
             points = smoothDiagonals(points);
         }
 */
-        int plane = shoal.getWorldEntity().getWorldView().getPlane();
+        WorldView shoalWV = (activeShoal != null && activeShoal.getWorldEntity() != null)
+                ? activeShoal.getWorldEntity().getWorldView()
+                : null;
 
         path.setStroke(new BasicStroke(1.5f));
 
@@ -143,13 +171,16 @@ public class DeepSeaTrawlingOverlay extends Overlay {
             }
 
             LocalPoint localPointA = LocalPoint.fromWorld(client, worldPointA);
+            if (localPointA == null && shoalWV != null) localPointA = LocalPoint.fromWorld(shoalWV, worldPointA);
+
             LocalPoint localPointB = LocalPoint.fromWorld(client, worldPointB);
+            if (localPointB == null && shoalWV != null) localPointB = LocalPoint.fromWorld(shoalWV, worldPointB);
             if (localPointA == null || localPointB == null) {
                 continue;
             }
 
-            Point pointA = Perspective.localToCanvas(client, localPointA, plane);
-            Point pointB = Perspective.localToCanvas(client, localPointB, plane);
+            Point pointA = Perspective.localToCanvas(client, localPointA, 0);
+            Point pointB = Perspective.localToCanvas(client, localPointB, 0);
             if (pointA == null || pointB == null)
             {
                 continue;
@@ -171,20 +202,18 @@ public class DeepSeaTrawlingOverlay extends Overlay {
         }
     }
 
-    private void drawStopSquares(Graphics2D square, ShoalData shoal, Color baseColour)
+    private void drawStopSquares(Graphics2D square, List<WorldPoint> stopPoints, WorldPoint currentWP, Color baseColour)
     {
         Color outline = new Color(baseColour.getRed(), baseColour.getGreen(), baseColour.getBlue());
         Color fill = new Color(baseColour.getRed(), baseColour.getGreen(), baseColour.getBlue(), 50);
 
-        WorldPoint shoalWP = shoal.getCurrentWorldPoint();
-
-        for (WorldPoint worldPoint : shoal.getStopPoints())
+        for (WorldPoint worldPoint : stopPoints)
         {
-            if (worldPoint == null ) {
+            if (worldPoint == null) {
                 continue;
             }
 
-            if (shoalWP != null && worldPoint.distanceTo(shoalWP) < 2) {
+            if (currentWP != null && worldPoint.distanceTo(currentWP) < 2) {
                 continue;
             }
 
