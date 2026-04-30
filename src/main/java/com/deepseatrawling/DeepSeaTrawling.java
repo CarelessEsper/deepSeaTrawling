@@ -88,6 +88,18 @@ public class DeepSeaTrawling extends Plugin
 
     private int lastNotifiedDepth = -1;
 
+    private Map<Integer, Integer> inventoryFishSnapshot = null;
+    private boolean collectingFromNet = false;
+
+    private static final Set<Integer> TRACKED_FISH_ITEM_IDS = new HashSet<>(Arrays.asList(
+            32309, // Giant Krill
+            32317, // Haddock
+            32325, // Yellowfin
+            32333, // Halibut
+            32341, // Bluefin
+            32349 // Marlin
+    ));
+
 	private TrawlingNetInfoBox trawlingNetInfoBox;
     private boolean wasOnBoat = false;
     private final Map<String, FishCatchInfoBox> fishCatchInfoBoxes = new HashMap<>();
@@ -168,9 +180,15 @@ public class DeepSeaTrawling extends Plugin
 		netObjectByIndex[1] = null;
         activeShoals.clear();
         nearestShoal = null;
+        collectingFromNet = false;
+        inventoryFishSnapshot = null;
 		chatCommandManager.unregisterCommand(CAUGHT_COMMAND);
 		log.info("Deep Sea Trawling Plugin Stopped");
 	}
+
+    private static final Set<Integer> COLLECTIBLE_NET_OBJECT_IDS = new HashSet<>(Arrays.asList(
+            59755, 59756, 59757, 59758, 59759, 59760, 59761, 59762, 59763, 59764, 59765, 59766
+    ));
 
     public final GameObject[] netObjectByIndex = new GameObject[2];
 
@@ -294,6 +312,73 @@ public class DeepSeaTrawling extends Plugin
     }
 
     @Subscribe
+    public void onMenuOptionClicked(MenuOptionClicked event)
+    {
+        if (!event.getMenuOption().equals("Collect-from")) return;
+        if (!COLLECTIBLE_NET_OBJECT_IDS.contains(event.getId())) return;
+
+        ItemContainer inventory = client.getItemContainer(93);
+        if (inventory == null) return;
+
+        inventoryFishSnapshot = snapshotFishInInventory(inventory);
+        collectingFromNet = true;
+        log.debug("Net collect-from detected, fish snapshot: {}", inventoryFishSnapshot);
+    }
+
+    @Subscribe
+    public void onWidgetClosed(WidgetClosed event)
+    {
+        if (!collectingFromNet) return;
+        if (event.getGroupId() != 219) return;
+
+        ItemContainer inventory = client.getItemContainer(93);
+        if (inventory == null || inventoryFishSnapshot == null)
+        {
+            collectingFromNet = false;
+            inventoryFishSnapshot = null;
+            return;
+        }
+
+        Map<Integer, Integer> afterSnapshot = snapshotFishInInventory(inventory);
+        int totalAdded = 0;
+        for (int itemId : TRACKED_FISH_ITEM_IDS)
+        {
+            int before = inventoryFishSnapshot.getOrDefault(itemId, 0);
+            int after = afterSnapshot.getOrDefault(itemId, 0);
+            int delta = after - before;
+            if (delta > 0)
+            {
+                totalAdded += delta;
+            }
+        }
+
+        if (totalAdded > 0)
+        {
+            log.debug("Partial net collection: {} fish moved to inventory, subtracting from net counter", totalAdded);
+            fishQuantity = Math.max(0, fishQuantity - totalAdded);
+            saveFishCounts();
+        }
+
+        collectingFromNet = false;
+        inventoryFishSnapshot = null;
+    }
+
+    private Map<Integer, Integer> snapshotFishInInventory(ItemContainer inventory)
+    {
+        Map<Integer, Integer> snapshot = new HashMap<>();
+        for (Item item : inventory.getItems())
+        {
+            if (item == null) continue;
+            int id = item.getId();
+            if (TRACKED_FISH_ITEM_IDS.contains(id))
+            {
+                snapshot.merge(id, item.getQuantity(), Integer::sum);
+            }
+        }
+        return snapshot;
+    }
+
+    @Subscribe
     public void onNpcSpawned(NpcSpawned e)
     {
         NPC eventNpc = e.getNpc();
@@ -321,6 +406,8 @@ public class DeepSeaTrawling extends Plugin
         if (state == GameState.HOPPING || state == GameState.LOGGING_IN) {
             fishQuantity = 0;
             wasOnBoat = false;
+            collectingFromNet = false;
+            inventoryFishSnapshot = null;
             for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
                 infoBoxManager.removeInfoBox(infoBox);
             }
@@ -440,12 +527,16 @@ public class DeepSeaTrawling extends Plugin
 			if (msg.startsWith("You empty the net") ||
                     msg.startsWith("You take all of the fish from the net")) {
                 fishQuantity = 0;
+                collectingFromNet = false;
+                inventoryFishSnapshot = null;
                 log.debug("Emptied nets");
                 notifiedFull = false;
                 saveFishCounts();
             } else if (msg.equals("You take some fish from the net")) {
                 log.debug("Unknown amount withdrawn from net, resetting to 0");
                 fishQuantity = 0;
+                collectingFromNet = false;
+                inventoryFishSnapshot = null;
                 notifiedFull = false;
                 saveFishCounts();
             }
