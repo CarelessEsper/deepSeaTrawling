@@ -55,7 +55,11 @@ public class DeepSeaTrawlingOverlay extends Overlay {
             ShoalData active = plugin.getActiveShoal(worldViewId);
             ShoalRoute route = entry.getValue();
             ShoalData.ShoalSpecies species = ShoalTypes.fromIdToSpecies(worldViewId);
-            Color colour = plugin.speciesColours.getOrDefault(species, Color.WHITE);
+
+            ShoalData.ShoalSpecies activeSpecies = (active != null && active.getSpecies() != null)
+                    ? active.getSpecies()
+                    : species;
+            Color colour = plugin.speciesColours.getOrDefault(activeSpecies, Color.WHITE);
 
             Color pathColour;
             if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID
