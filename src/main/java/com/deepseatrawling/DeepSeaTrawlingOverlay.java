@@ -63,10 +63,10 @@ public class DeepSeaTrawlingOverlay extends Overlay {
 
             Color pathColour;
             if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID
-                    && species != null
-                    && (species == ShoalData.ShoalSpecies.SHIMMERING
-                        || species == ShoalData.ShoalSpecies.GLISTENING
-                        || species == ShoalData.ShoalSpecies.VIBRANT)) {
+                    && activeSpecies != null
+                    && (activeSpecies == ShoalData.ShoalSpecies.SHIMMERING
+                        || activeSpecies == ShoalData.ShoalSpecies.GLISTENING
+                        || activeSpecies == ShoalData.ShoalSpecies.VIBRANT)) {
                 pathColour = config.specialPathColour();
             } else if (config.pathColourMode() == DeepSeaTrawlingConfig.PathColourMode.SOLID) {
                 pathColour = config.shoalPathColour();
