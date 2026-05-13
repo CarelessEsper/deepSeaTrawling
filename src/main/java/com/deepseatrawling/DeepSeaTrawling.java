@@ -615,7 +615,9 @@ public class DeepSeaTrawling extends Plugin
 				if (e.getValue() == 1) {
 					wasOnBoat = true; // Track this to avoid wipes during login state change
 				} else if (e.getValue() == 0 && wasOnBoat) {
-					wasOnBoat = false; 
+					wasOnBoat = false;
+					fishQuantity = 0;
+					notifiedFull = false;
 					log.debug("Disembarked from boat - clearing fish counts");
 					for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
 						infoBox.resetCount();
