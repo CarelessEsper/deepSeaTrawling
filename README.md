@@ -63,4 +63,4 @@ The Deep Sea Trawling plugin is a RuneLite plugin that helps make the Deep Sea T
 
 - **Miscellaneous:** Config settings miscellaneous features:
   - Show a trip summary in chat when you disembark
-![](assets/ColoursConfig.png)
+![](assets/TripSummaryConfig.png)
