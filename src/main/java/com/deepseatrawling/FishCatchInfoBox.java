@@ -28,6 +28,11 @@ public class FishCatchInfoBox extends InfoBox {
         this.count += amount;
     }
 
+    public void decrementCount(int amount)
+    {
+        this.count = Math.max(0, this.count - amount);
+    }
+
     public void incrementHoldCount(int amount)
     {
         this.holdCount += amount;

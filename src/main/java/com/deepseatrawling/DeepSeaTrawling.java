@@ -295,8 +295,19 @@ public class DeepSeaTrawling extends Plugin
 
         if (shoal.getWorldViewId() == worldViewId)
         {
+            ShoalData.ShoalSpecies previousSpecies = shoal.getSpecies();
             shoal.setSpecies(species);
             shoal.setShoalObject(obj);
+
+            // Notify if the nearest shoal just became a special shoal
+            if (shoal == nearestShoal
+                    && (species == ShoalData.ShoalSpecies.SHIMMERING || species == ShoalData.ShoalSpecies.GLISTENING || species == ShoalData.ShoalSpecies.VIBRANT)
+                    && (previousSpecies == null || (previousSpecies != ShoalData.ShoalSpecies.SHIMMERING && previousSpecies != ShoalData.ShoalSpecies.GLISTENING && previousSpecies != ShoalData.ShoalSpecies.VIBRANT)))
+            {
+                if (isNotifyGuardPassed()) {
+                    notifier.notify(config.notifySpecialShoal(), "Shoal has become a " + species.name().charAt(0) + species.name().substring(1).toLowerCase() + " shoal!");
+                }
+            }
 
             WorldEntity shoalWorldEntity= shoal.getWorldEntity();
             if (shoalWorldEntity == null) return;
@@ -519,6 +530,11 @@ public class DeepSeaTrawling extends Plugin
     public void onGameStateChanged(GameStateChanged e) {
         GameState state = e.getGameState();
         if (state == GameState.HOPPING || state == GameState.LOGGING_IN) {
+            // Fish remaining in nets are lost on hop — remove them from totals
+            for (AbstractMap.SimpleEntry<String, Integer> entry : netQueue) {
+                FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(entry.getKey());
+                if (infoBox != null) infoBox.decrementCount(entry.getValue());
+            }
             fishQuantity = 0;
             wasOnBoat = false;
             collectingFromNet = false;
@@ -533,6 +549,7 @@ public class DeepSeaTrawling extends Plugin
                 nearestShoal.clearStopTimer();
                 nearestShoal.setLast(null);
             }
+            saveFishCounts();
         }
     }
 
@@ -675,7 +692,11 @@ public class DeepSeaTrawling extends Plugin
                     log.debug("Emptied nets to cargo hold");
                     saveFishCounts();
                 } else {
-                    // Full inventory collection — onWidgetClosed should handle the diff and cleanup
+                    // Full inventory collection — credit inventory counts then clear
+                    for (AbstractMap.SimpleEntry<String, Integer> entry : netQueue) {
+                        FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(entry.getKey());
+                        if (infoBox != null) infoBox.incrementInventoryCount(entry.getValue());
+                    }
                     netQueue.clear();
                     fishQuantity = 0;
                     notifiedFull = false;
@@ -782,7 +803,6 @@ public class DeepSeaTrawling extends Plugin
 							if (box.getCount() > 0) caughtParts.add(box.getCount() + " " + entry.getKey());
 							if (box.getInventoryCount() > 0) holdParts.add(box.getInventoryCount() + " " + entry.getKey());
 						}
-						if (unknownHoldCount > 0) holdParts.add(unknownHoldCount + " unknown");
 
 						if (!caughtParts.isEmpty()) {
 							String msg = "<col=005f9e>[Deep Sea Trawling] Trip summary — Caught " + String.join(", ", caughtParts);

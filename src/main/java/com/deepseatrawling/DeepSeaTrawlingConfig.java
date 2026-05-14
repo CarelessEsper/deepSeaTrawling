@@ -242,6 +242,18 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default boolean infoboxFishTypeEnabled() { return false; }
 
+    enum TripSummaryMode
+    {
+        INVENTORY("Taken to inventory"),
+        CARGO_HOLD("Sent to cargo hold");
+
+        private final String name;
+        TripSummaryMode(String name) { this.name = name; }
+
+        @Override
+        public String toString() { return name; }
+    }
+
     @ConfigItem(
             keyName = "reportTripTotals",
             name = "Show trip summary on disembark",
@@ -301,6 +313,15 @@ public interface DeepSeaTrawlingConfig extends Config
             section  = notifSection
     )
     default Notification notifyShoalMoving() { return Notification.ON; }
+
+    @ConfigItem(
+            keyName = "notifySpecialShoal",
+            name = "Notify when shoal becomes special",
+            description = "Shows a RuneLite notification when the nearest shoal transforms into a special shoal (Shimmering, Glistening, or Vibrant)",
+            position = 4,
+            section = notifSection
+    )
+    default Notification notifySpecialShoal() { return Notification.ON; }
 
     // -------------- Colours ---------------------
     @Alpha
