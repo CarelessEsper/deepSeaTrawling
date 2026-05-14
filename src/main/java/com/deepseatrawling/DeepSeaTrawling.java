@@ -2,9 +2,6 @@ package com.deepseatrawling;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import net.runelite.client.chat.ChatColorType;
-import net.runelite.client.chat.ChatCommandManager;
-import net.runelite.client.chat.ChatMessageBuilder;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -55,11 +52,6 @@ public class DeepSeaTrawling extends Plugin
 
 	@Inject
 	private Client client;
-
-	@Inject
-	private ChatCommandManager chatCommandManager;
-
-	private static final String CAUGHT_COMMAND = "!caught";
 
 	@Inject
 	private DeepSeaTrawlingConfig config;
@@ -169,7 +161,6 @@ public class DeepSeaTrawling extends Plugin
         }
 
 		log.info("Deep Sea Trawling Plugin Started");
-		chatCommandManager.registerCommandAsync(CAUGHT_COMMAND, this::onCaughtCommand);
 
 	}
 
@@ -199,7 +190,6 @@ public class DeepSeaTrawling extends Plugin
         netCountUnknownFromCargoHold = false;
         unknownHoldCount = 0;
         netCountBeforeCargoHold = 0;
-		chatCommandManager.unregisterCommand(CAUGHT_COMMAND);
 		log.info("Deep Sea Trawling Plugin Stopped");
 	}
 
@@ -1049,29 +1039,6 @@ public class DeepSeaTrawling extends Plugin
 	public Map<String, FishCatchInfoBox> getFishCatchInfoBoxes() {
 		return fishCatchInfoBoxes;
 	}
-
-    private void onCaughtCommand(ChatMessage chatMessage, String message)
-    {
-        if (fishCatchInfoBoxes.isEmpty()) return;
-
-        ChatMessageBuilder builder = new ChatMessageBuilder();
-        boolean first = true;
-        for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
-            int count = entry.getValue().getCount();
-            if (count <= 0) continue;
-            if (!first) builder.append(ChatColorType.NORMAL).append(", ");
-            builder.append(ChatColorType.HIGHLIGHT).append(entry.getKey())
-                    .append(ChatColorType.NORMAL).append(" caught: ")
-                    .append(ChatColorType.HIGHLIGHT).append(String.format("%,d", count));
-            first = false;
-        }
-        if (first) return;
-
-        String response = builder.build();
-        chatMessage.setMessage(response);
-        chatMessage.getMessageNode().setRuneLiteFormatMessage(response);
-        client.refreshChat();
-    }
 
     private static String toTitleCase(String input) {
         if (input == null || input.isEmpty()) return input;
