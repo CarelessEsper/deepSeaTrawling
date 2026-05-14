@@ -20,8 +20,10 @@ The Deep Sea Trawling plugin is a RuneLite plugin that helps make the Deep Sea T
 ![](/assets/NetDepthTextRSMD.png)
 - **Gradient path colour mode:** The option to change the paths from a solid color to a rainbow gradient.\
 ![](/assets/PathGradient.png)
-- **Notifications:** Windows notifications if you're not tabbed in to the game for when the net changes depth, starts moving and when the nets are full.\
+- **Notifications:** Customizable Windows notifications if you're not tabbed in to the game for when the net changes depth, starts moving, becomes special, and when the nets are full.\
 ![](assets/NotificationExample.png)
+- **Trip Summaries:** Display a trawling summary message when you disembark from your boat to show your total catch and how many were collected to your inventory.\
+![](assets/TripSummaryExample.png)
 
 # Configuration
 - **Shoal config:** Config settings for the shoals:
@@ -44,9 +46,11 @@ The Deep Sea Trawling plugin is a RuneLite plugin that helps make the Deep Sea T
 ![](assets/NetsConfig.png)
 
 - **Notification config:** Config settings for the notifications:
+  - Conditions dropdown to configure when notifications are allowed to trigger
   - Notification toggle for when your nets are full
   - Notification toggle for when the depth changes
-  - Notification toggle for when the shoal starts moving\
+  - Notification toggle for when the shoal starts moving
+  - Notification toggle for when the shoal becomes a special type\
 ![](assets/NotificationsConfig.png)
 
 - **Colour config:** Config settings for all the colours you can change within the plugin:
@@ -56,3 +60,7 @@ The Deep Sea Trawling plugin is a RuneLite plugin that helps make the Deep Sea T
   - Regular and special path colours
   - All the kinds of fish tagging colours\
 ![](assets/ColoursConfig.png)
+
+- **Miscellaneous:** Config settings miscellaneous features:
+  - Show a trip summary in chat when you disembark\
+![](assets/TripSummaryConfig.png)

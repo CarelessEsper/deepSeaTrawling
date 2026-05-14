@@ -41,6 +41,13 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     String coloursSection = "Colours Section";
 
+    @ConfigSection(
+            name = "Miscellaneous",
+            description = "Other settings",
+            position = 4
+    )
+    String miscSection = "Misc Section";
+
 
     // --------------- Shoals Section ------------------
     @ConfigItem(
@@ -235,6 +242,15 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default boolean infoboxFishTypeEnabled() { return false; }
 
+    @ConfigItem(
+            keyName = "reportTripTotals",
+            name = "Show trip summary on disembark",
+            description = "Show a chat message with total fish caught and number collected to inventory when you leave the boat",
+            position = 0,
+            section = miscSection
+    )
+    default boolean reportTripTotals() { return true; }
+
     // ---------- Notifications ----------
     enum NotifyGuard
     {
@@ -285,6 +301,15 @@ public interface DeepSeaTrawlingConfig extends Config
             section  = notifSection
     )
     default Notification notifyShoalMoving() { return Notification.ON; }
+
+    @ConfigItem(
+            keyName = "notifySpecialShoal",
+            name = "Notify when shoal becomes special",
+            description = "Shows a RuneLite notification when the nearest shoal transforms into a special shoal (Shimmering, Glistening, or Vibrant)",
+            position = 4,
+            section = notifSection
+    )
+    default Notification notifySpecialShoal() { return Notification.ON; }
 
     // -------------- Colours ---------------------
     @Alpha
