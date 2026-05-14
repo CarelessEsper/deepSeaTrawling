@@ -15,6 +15,7 @@ import net.runelite.api.events.*;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.ObjectID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.Notifier;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -49,6 +50,8 @@ public class DeepSeaTrawling extends Plugin
 
 	private static final String CONFIG_GROUP = "deepseatrawling";
 	private static final String FISH_COUNTS_KEY = "fishCounts";
+	private static final String FISH_HOLD_COUNTS_KEY = "fishHoldCounts";
+	private static final String FISH_INVENTORY_COUNTS_KEY = "fishInventoryCounts";
 
 	@Inject
 	private Client client;
@@ -84,12 +87,20 @@ public class DeepSeaTrawling extends Plugin
 
     @Inject
     private Notifier notifier;
+
+    @Inject
+    private net.runelite.client.callback.ClientThread clientThread;
     private boolean notifiedFull = false;
 
     private int lastNotifiedDepth = -1;
 
     private Map<Integer, Integer> inventoryFishSnapshot = null;
     private boolean collectingFromNet = false;
+    // Set when cargo hold fills during a partial deposit — net count is unknown until player next checks nets.
+    private boolean netCountUnknown = false;
+    private boolean netCountUnknownFromCargoHold = false;
+    private int unknownHoldCount = 0;
+    private int netCountBeforeCargoHold = 0; // fishQuantity at time of partial cargo hold
 
     private static final Set<Integer> TRACKED_FISH_ITEM_IDS = new HashSet<>(Arrays.asList(
             32309, // Giant Krill
@@ -182,6 +193,11 @@ public class DeepSeaTrawling extends Plugin
         nearestShoal = null;
         collectingFromNet = false;
         inventoryFishSnapshot = null;
+        netQueue.clear();
+        netCountUnknown = false;
+        netCountUnknownFromCargoHold = false;
+        unknownHoldCount = 0;
+        netCountBeforeCargoHold = 0;
 		chatCommandManager.unregisterCommand(CAUGHT_COMMAND);
 		log.info("Deep Sea Trawling Plugin Stopped");
 	}
@@ -193,6 +209,15 @@ public class DeepSeaTrawling extends Plugin
     public final GameObject[] netObjectByIndex = new GameObject[2];
 
 	public int fishQuantity = 0;
+
+    // track which fish types are removed during partial inventory pulls
+    public final LinkedList<AbstractMap.SimpleEntry<String, Integer>> netQueue = new LinkedList<>();
+
+    private int netQueueTotal() {
+        int total = 0;
+        for (AbstractMap.SimpleEntry<String, Integer> e : netQueue) total += e.getValue();
+        return total;
+    }
 
 	@Subscribe
 	public void onWorldEntitySpawned(WorldEntitySpawned event) {
@@ -312,6 +337,88 @@ public class DeepSeaTrawling extends Plugin
     }
 
     @Subscribe
+    public void onWidgetLoaded(WidgetLoaded event)
+    {
+        if (event.getGroupId() != 219 || !netCountUnknown) return;
+
+        // only process if the player is on a boat 
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer == null || localPlayer.getWorldView() == null) return;
+        if (!boats.containsKey(localPlayer.getWorldView().getId())) return;
+
+        clientThread.invokeLater(() -> readNetCountFromWidget());
+    }
+
+    private void readNetCountFromWidget()
+    {
+        if (!netCountUnknown) return;
+        Widget parent = client.getWidget(219, 1);
+        if (parent == null || parent.isHidden()) return;
+        Widget[] dynamic = parent.getDynamicChildren();
+        if (dynamic == null || dynamic.length == 0) return;
+
+        String text = dynamic[0].getText();
+        if (text == null || !text.startsWith("There ")) return;
+
+        String[] parts = text.split(" ");
+        if (parts.length < 3) return;
+
+        try {
+            String countWord = parts[2];
+            int trueNetCount;
+            if (countWord.equals("no")) {
+                trueNetCount = 0;
+            } else {
+                try {
+                    trueNetCount = Integer.parseInt(countWord);
+                } catch (NumberFormatException e) {
+                    trueNetCount = convertToNumber(countWord);
+                }
+            }
+            log.debug("Resolved net count from widget: {} (text='{}')", trueNetCount, text);
+
+            // Trim the queue to trueNetCount from the tail (everything before trueNetCount went to the hold)
+            if (netCountUnknownFromCargoHold)
+            {
+                int depositedToHold = netCountBeforeCargoHold - trueNetCount;
+                if (depositedToHold > 0) unknownHoldCount += depositedToHold;
+                // Replace queue with unknown entry — types of remaining fish are no longer known
+                netQueue.clear();
+                if (trueNetCount > 0)
+                {
+                    netQueue.addLast(new AbstractMap.SimpleEntry<>("Unknown", trueNetCount));
+                }
+                netCountUnknownFromCargoHold = false;
+                netCountBeforeCargoHold = 0;
+                log.debug("Partial cargo hold resolved: {} to hold (unknown), {} unknown remain in nets", depositedToHold, trueNetCount);
+            }
+            else
+            {
+                // Partial inventory — trim front of queue, crediting those to hold
+                int queueTotal = netQueueTotal();
+                int toRemoveFromFront = queueTotal - trueNetCount;
+                log.debug("Trimming {} from front of queue (queue={} trueNet={})", toRemoveFromFront, queueTotal, trueNetCount);
+                while (toRemoveFromFront > 0 && !netQueue.isEmpty())
+                {
+                    AbstractMap.SimpleEntry<String, Integer> head = netQueue.peekFirst();
+                    int remove = Math.min(head.getValue(), toRemoveFromFront);
+                    toRemoveFromFront -= remove;
+                    FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(head.getKey());
+                    if (infoBox != null) infoBox.incrementHoldCount(remove);
+                    if (remove == head.getValue()) netQueue.pollFirst();
+                    else head.setValue(head.getValue() - remove);
+                }
+            }
+
+            fishQuantity = netQueueTotal();
+            netCountUnknown = false;
+            saveFishCounts();
+        } catch (IllegalArgumentException e) {
+            log.debug("Could not parse net count from widget text: '{}'", text);
+        }
+    }
+
+    @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event)
     {
         if (!event.getMenuOption().equals("Collect-from")) return;
@@ -346,16 +453,24 @@ public class DeepSeaTrawling extends Plugin
             int before = inventoryFishSnapshot.getOrDefault(itemId, 0);
             int after = afterSnapshot.getOrDefault(itemId, 0);
             int delta = after - before;
-            if (delta > 0)
-            {
-                totalAdded += delta;
-            }
+            if (delta > 0) totalAdded += delta;
         }
 
         if (totalAdded > 0)
         {
-            log.debug("Partial net collection: {} fish moved to inventory, subtracting from net counter", totalAdded);
-            fishQuantity = Math.max(0, fishQuantity - totalAdded);
+            int remaining = totalAdded;
+            while (remaining > 0 && !netQueue.isEmpty())
+            {
+                AbstractMap.SimpleEntry<String, Integer> head = netQueue.peekFirst();
+                int take = Math.min(head.getValue(), remaining);
+                remaining -= take;
+                FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(head.getKey());
+                if (infoBox != null) infoBox.incrementInventoryCount(take);
+                if (take == head.getValue()) netQueue.pollFirst();
+                else head.setValue(head.getValue() - take);
+            }
+            log.debug("Partial inventory collection: {} fish moved to inventory", totalAdded);
+            fishQuantity = netQueueTotal();
             saveFishCounts();
         }
 
@@ -408,10 +523,11 @@ public class DeepSeaTrawling extends Plugin
             wasOnBoat = false;
             collectingFromNet = false;
             inventoryFishSnapshot = null;
-            for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
-                infoBoxManager.removeInfoBox(infoBox);
-            }
-            fishCatchInfoBoxes.clear();
+            netQueue.clear();
+            netCountUnknown = false;
+            netCountUnknownFromCargoHold = false;
+            unknownHoldCount = 0;
+            netCountBeforeCargoHold = 0;
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
@@ -422,12 +538,21 @@ public class DeepSeaTrawling extends Plugin
 
     @Subscribe
     public void onAccountHashChanged(AccountHashChanged e) {
-        loadFishCounts();
+        if (!wasOnBoat) loadFishCounts();
     }
 
     @Subscribe
     public void onGameTick(GameTick tick)
     {
+        if (netCountUnknown)
+        {
+            Widget parent = client.getWidget(219, 1);
+            if (parent != null && !parent.isHidden())
+            {
+                readNetCountFromWidget();
+            }
+        }
+
         for (ShoalData shoal : activeShoals.values()) {
             WorldEntity shoalWorldEntity = shoal.getWorldEntity();
             if (shoalWorldEntity == null) continue;
@@ -526,19 +651,39 @@ public class DeepSeaTrawling extends Plugin
             String msg = event.getMessage().replaceAll("<[^>]*>","");
 			if (msg.startsWith("You empty the net") ||
                     msg.startsWith("You take all of the fish from the net")) {
-                fishQuantity = 0;
-                collectingFromNet = false;
-                inventoryFishSnapshot = null;
-                log.debug("Emptied nets");
-                notifiedFull = false;
-                saveFishCounts();
+                if (msg.contains("cargo hold") && msg.contains("not enough space")) {
+                    // Partial cargo hold — keep queue intact (tail = what remains, front = what went to hold)
+                    // Types that went to hold are unknown; resolved via widget next time it's opened
+                    netCountBeforeCargoHold = fishQuantity;
+                    netCountUnknown = true;
+                    netCountUnknownFromCargoHold = true;
+                    collectingFromNet = false;
+                    inventoryFishSnapshot = null;
+                    log.debug("Partial cargo hold deposit - net count now unknown, queue preserved");
+                    saveFishCounts();
+                } else if (msg.contains("cargo hold")) {
+                    // Full cargo hold — credit hold counts and clear
+                    for (AbstractMap.SimpleEntry<String, Integer> entry : netQueue) {
+                        FishCatchInfoBox infoBox = fishCatchInfoBoxes.get(entry.getKey());
+                        if (infoBox != null) infoBox.incrementHoldCount(entry.getValue());
+                    }
+                    netQueue.clear();
+                    fishQuantity = 0;
+                    collectingFromNet = false;
+                    inventoryFishSnapshot = null;
+                    notifiedFull = false;
+                    log.debug("Emptied nets to cargo hold");
+                    saveFishCounts();
+                } else {
+                    // Full inventory collection — onWidgetClosed should handle the diff and cleanup
+                    netQueue.clear();
+                    fishQuantity = 0;
+                    notifiedFull = false;
+                    log.debug("Emptied nets to inventory");
+                    saveFishCounts();
+                }
             } else if (msg.equals("You take some fish from the net")) {
-                log.debug("Unknown amount withdrawn from net, resetting to 0");
-                fishQuantity = 0;
-                collectingFromNet = false;
-                inventoryFishSnapshot = null;
-                notifiedFull = false;
-                saveFishCounts();
+                // Partial inventory collection — onWidgetClosed handles the diff
             }
 
             if (msg.contains("Trawler's trust")) {
@@ -587,12 +732,14 @@ public class DeepSeaTrawling extends Plugin
                 }
                 if (totalNetSize > 0) {
                     int amount = convertToNumber(quantityStr);
-					fishQuantity += amount;
-
-					// Track individual fish types
-					if (!fishName.isEmpty()) {
-						trackFishCatch(toTitleCase(fishName), amount);
-					}
+                    if (!fishName.isEmpty()) {
+                        String titleFishName = toTitleCase(fishName);
+                        netQueue.addLast(new AbstractMap.SimpleEntry<>(titleFishName, amount));
+                        trackFishCatch(titleFishName, amount);
+                    } else {
+                        netQueue.addLast(new AbstractMap.SimpleEntry<>("Unknown", amount));
+                    }
+                    fishQuantity = netQueueTotal();
                 }
                 if (fishQuantity >= totalNetSize && !notifiedFull) {
                     if (isNotifyGuardPassed()) {
@@ -618,13 +765,41 @@ public class DeepSeaTrawling extends Plugin
 					wasOnBoat = false;
 					fishQuantity = 0;
 					notifiedFull = false;
+					netQueue.clear();
+					netCountUnknown = false;
+					netCountUnknownFromCargoHold = false;
+					unknownHoldCount = 0;
+					netCountBeforeCargoHold = 0;
 					log.debug("Disembarked from boat - clearing fish counts");
+
+					// Report trip summary before clearing
+					if (config.reportTripTotals() && !fishCatchInfoBoxes.isEmpty()) {
+						List<String> caughtParts = new ArrayList<>();
+						List<String> holdParts = new ArrayList<>();
+
+						for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
+							FishCatchInfoBox box = entry.getValue();
+							if (box.getCount() > 0) caughtParts.add(box.getCount() + " " + entry.getKey());
+							if (box.getInventoryCount() > 0) holdParts.add(box.getInventoryCount() + " " + entry.getKey());
+						}
+						if (unknownHoldCount > 0) holdParts.add(unknownHoldCount + " unknown");
+
+						if (!caughtParts.isEmpty()) {
+							String msg = "<col=005f9e>[Deep Sea Trawling] Trip summary — Caught " + String.join(", ", caughtParts);
+							if (!holdParts.isEmpty()) msg += " (" + String.join(", ", holdParts) + " taken to inventory)";
+							msg += "</col>";
+							client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null);
+						}
+					}
+
 					for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
 						infoBox.resetCount();
 						infoBoxManager.removeInfoBox(infoBox);
 					}
 					fishCatchInfoBoxes.clear();
 					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
+					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
 				}
 				break;
 			case VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_DEPTH:
@@ -703,17 +878,18 @@ public class DeepSeaTrawling extends Plugin
 		log.info(builder.toString());*/
 	}
 
-	private static final Map<String, Integer> WORD_NUMBERS = Map.of(
-			"a", 1,
-			"two", 2,
-			"three", 3,
-			"four", 4,
-			"five", 5,
-			"six", 6,
-			"seven", 7,
-			"eight", 8,
-			"nine", 9,
-			"ten", 10
+	private static final Map<String, Integer> WORD_NUMBERS = Map.ofEntries(
+			Map.entry("a", 1),
+			Map.entry("one", 1),
+			Map.entry("two", 2),
+			Map.entry("three", 3),
+			Map.entry("four", 4),
+			Map.entry("five", 5),
+			Map.entry("six", 6),
+			Map.entry("seven", 7),
+			Map.entry("eight", 8),
+			Map.entry("nine", 9),
+			Map.entry("ten", 10)
 	);
 
 	private int convertToNumber(String s)
@@ -885,11 +1061,17 @@ public class DeepSeaTrawling extends Plugin
 
     private void saveFishCounts() {
         Map<String, Integer> counts = new HashMap<>();
+        Map<String, Integer> holdCounts = new HashMap<>();
+        Map<String, Integer> inventoryCounts = new HashMap<>();
         for (Map.Entry<String, FishCatchInfoBox> entry : fishCatchInfoBoxes.entrySet()) {
             counts.put(entry.getKey(), entry.getValue().getCount());
+            holdCounts.put(entry.getKey(), entry.getValue().getHoldCount());
+            inventoryCounts.put(entry.getKey(), entry.getValue().getInventoryCount());
         }
         configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY, gson.toJson(counts));
-        log.debug("Saved fish counts: {}", counts);
+        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY, gson.toJson(holdCounts));
+        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY, gson.toJson(inventoryCounts));
+        log.debug("Saved fish counts: {} hold: {} inventory: {}", counts, holdCounts, inventoryCounts);
     }
 
     private void loadFishCounts() {
@@ -899,6 +1081,14 @@ public class DeepSeaTrawling extends Plugin
         Type type = new TypeToken<Map<String, Integer>>(){}.getType();
         Map<String, Integer> counts = gson.fromJson(json, type);
         if (counts == null) return;
+
+        String holdJson = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
+        Map<String, Integer> holdCounts = holdJson != null ? gson.fromJson(holdJson, type) : new HashMap<>();
+        if (holdCounts == null) holdCounts = new HashMap<>();
+
+        String inventoryJson = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
+        Map<String, Integer> inventoryCounts = inventoryJson != null ? gson.fromJson(inventoryJson, type) : new HashMap<>();
+        if (inventoryCounts == null) inventoryCounts = new HashMap<>();
 
         // Clear any existing boxes before loading to avoid duplicates getting created
         for (FishCatchInfoBox infoBox : fishCatchInfoBoxes.values()) {
@@ -916,10 +1106,14 @@ public class DeepSeaTrawling extends Plugin
 
             FishCatchInfoBox infoBox = new FishCatchInfoBox(icon, this, config, fishName);
             infoBox.incrementCount(count);
+            int holdCount = holdCounts.getOrDefault(fishName, 0);
+            if (holdCount > 0) infoBox.incrementHoldCount(holdCount);
+            int inventoryCount = inventoryCounts.getOrDefault(fishName, 0);
+            if (inventoryCount > 0) infoBox.incrementInventoryCount(inventoryCount);
             fishCatchInfoBoxes.put(fishName, infoBox);
             infoBoxManager.addInfoBox(infoBox);
         }
-        log.debug("Loaded fish counts: {}", counts);
+        log.debug("Loaded fish counts: {} hold: {} inventory: {}", counts, holdCounts, inventoryCounts);
     }
 
     private void updateNearestShoalSticky() {

@@ -10,6 +10,8 @@ public class FishCatchInfoBox extends InfoBox {
     private final DeepSeaTrawlingConfig config;
     private final String fishName;
     private int count;
+    private int holdCount;
+    private int inventoryCount;
 
     public FishCatchInfoBox(BufferedImage image, DeepSeaTrawling plugin, DeepSeaTrawlingConfig config, String fishName)
     {
@@ -18,6 +20,7 @@ public class FishCatchInfoBox extends InfoBox {
         this.config = config;
         this.fishName = fishName;
         this.count = 0;
+        this.holdCount = 0;
     }
 
     public void incrementCount(int amount)
@@ -25,14 +28,36 @@ public class FishCatchInfoBox extends InfoBox {
         this.count += amount;
     }
 
+    public void incrementHoldCount(int amount)
+    {
+        this.holdCount += amount;
+    }
+
+    public void incrementInventoryCount(int amount)
+    {
+        this.inventoryCount += amount;
+    }
+
     public void resetCount()
     {
         this.count = 0;
+        this.holdCount = 0;
+        this.inventoryCount = 0;
     }
 
     public int getCount()
     {
         return count;
+    }
+
+    public int getHoldCount()
+    {
+        return holdCount;
+    }
+
+    public int getInventoryCount()
+    {
+        return inventoryCount;
     }
 
     @Override
@@ -50,7 +75,7 @@ public class FishCatchInfoBox extends InfoBox {
     @Override
     public String getTooltip()
     {
-        return "total " + fishName + ": " + count;
+        return "Total " + fishName + ": " + count + "</br>Sent to cargo: " + holdCount;
     }
 
     @Override
