@@ -91,6 +91,7 @@ public class DeepSeaTrawling extends Plugin
     @Inject
     private net.runelite.client.callback.ClientThread clientThread;
     private boolean notifiedFull = false;
+    private boolean pendingInitialLoad = true;
 
     private int lastNotifiedDepth = -1;
 
@@ -529,6 +530,10 @@ public class DeepSeaTrawling extends Plugin
     @Subscribe
     public void onGameStateChanged(GameStateChanged e) {
         GameState state = e.getGameState();
+        if (state == GameState.LOGGED_IN && pendingInitialLoad) {
+            pendingInitialLoad = false;
+            loadFishCounts();
+        }
         if (state == GameState.HOPPING || state == GameState.LOGGING_IN) {
             // Fish remaining in nets are lost on hop — remove them from totals
             for (AbstractMap.SimpleEntry<String, Integer> entry : netQueue) {
@@ -549,13 +554,15 @@ public class DeepSeaTrawling extends Plugin
                 nearestShoal.clearStopTimer();
                 nearestShoal.setLast(null);
             }
-            saveFishCounts();
+            if (state == GameState.HOPPING) {
+                saveFishCounts();
+            }
         }
     }
 
     @Subscribe
     public void onAccountHashChanged(AccountHashChanged e) {
-        if (!wasOnBoat) loadFishCounts();
+        loadFishCounts();
     }
 
     @Subscribe
@@ -817,9 +824,9 @@ public class DeepSeaTrawling extends Plugin
 						infoBoxManager.removeInfoBox(infoBox);
 					}
 					fishCatchInfoBoxes.clear();
-					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
-					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
-					configManager.unsetRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
+					configManager.unsetConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+					configManager.unsetConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
+					configManager.unsetConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
 				}
 				break;
 			case VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_DEPTH:
@@ -1088,25 +1095,25 @@ public class DeepSeaTrawling extends Plugin
             holdCounts.put(entry.getKey(), entry.getValue().getHoldCount());
             inventoryCounts.put(entry.getKey(), entry.getValue().getInventoryCount());
         }
-        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY, gson.toJson(counts));
-        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY, gson.toJson(holdCounts));
-        configManager.setRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY, gson.toJson(inventoryCounts));
+        configManager.setConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY, gson.toJson(counts));
+        configManager.setConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY, gson.toJson(holdCounts));
+        configManager.setConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY, gson.toJson(inventoryCounts));
         log.debug("Saved fish counts: {} hold: {} inventory: {}", counts, holdCounts, inventoryCounts);
     }
 
     private void loadFishCounts() {
-        String json = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
+        String json = configManager.getConfiguration(CONFIG_GROUP, FISH_COUNTS_KEY);
         if (json == null) return;
 
         Type type = new TypeToken<Map<String, Integer>>(){}.getType();
         Map<String, Integer> counts = gson.fromJson(json, type);
         if (counts == null) return;
 
-        String holdJson = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
+        String holdJson = configManager.getConfiguration(CONFIG_GROUP, FISH_HOLD_COUNTS_KEY);
         Map<String, Integer> holdCounts = holdJson != null ? gson.fromJson(holdJson, type) : new HashMap<>();
         if (holdCounts == null) holdCounts = new HashMap<>();
 
-        String inventoryJson = configManager.getRSProfileConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
+        String inventoryJson = configManager.getConfiguration(CONFIG_GROUP, FISH_INVENTORY_COUNTS_KEY);
         Map<String, Integer> inventoryCounts = inventoryJson != null ? gson.fromJson(inventoryJson, type) : new HashMap<>();
         if (inventoryCounts == null) inventoryCounts = new HashMap<>();
 
