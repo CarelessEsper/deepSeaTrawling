@@ -242,18 +242,6 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default boolean infoboxFishTypeEnabled() { return false; }
 
-    enum TripSummaryMode
-    {
-        INVENTORY("Taken to inventory"),
-        CARGO_HOLD("Sent to cargo hold");
-
-        private final String name;
-        TripSummaryMode(String name) { this.name = name; }
-
-        @Override
-        public String toString() { return name; }
-    }
-
     @ConfigItem(
             keyName = "reportTripTotals",
             name = "Show trip summary on disembark",
