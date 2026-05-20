@@ -4,12 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum ShoalTypes {
-    GIANT_KRILL(26, 27, 28, 29),
-    HADDOCK(23, 24, 25),
-    YELLOWFIN(20, 21, 22),
-    HALIBUT(18, 19),
-    BLUEFIN(16, 17),
-    MARLIN(14, 15);
+    GIANT_KRILL(27, 28, 29, 30),
+    HADDOCK(24, 25, 26),
+    YELLOWFIN(21, 22, 23),
+    HALIBUT(19, 20),
+    BLUEFIN(17, 18),
+    MARLIN(15, 16);
 
     private static final Map<Integer, ShoalTypes> SHOAL_ID = new HashMap<>();
 
