@@ -146,7 +146,7 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.add(widgetOverlay);
 		overlayManager.add(trawlingNetOverlay);
 
-		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/deepseatrawling_icon.png");
+		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/netInfobox_icon.png");
 		trawlingNetInfoBox = new TrawlingNetInfoBox(icon, this, config);
 		infoBoxManager.addInfoBox(trawlingNetInfoBox);
 
