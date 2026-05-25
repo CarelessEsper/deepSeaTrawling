@@ -320,7 +320,7 @@ public interface DeepSeaTrawlingConfig extends Config
             position = 0,
             section = coloursSection
     )
-    default Color fishCounterTextColour() { return Color.GRAY; }
+    default Color fishCounterTextColour() { return Color.WHITE; }
 
     @Alpha
     @ConfigItem(
