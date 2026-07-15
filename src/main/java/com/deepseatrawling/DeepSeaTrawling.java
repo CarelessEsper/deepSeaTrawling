@@ -704,6 +704,11 @@ public class DeepSeaTrawling extends Plugin
                 // Partial inventory collection — onWidgetClosed handles the diff
             }
 
+            if (msg.equals("Your hands grow numb from holding the net")) {
+                notifier.notify(config.notifyKickedFromNet(), "You were removed from the trawling net due to inactivity!");
+                return;
+            }
+
             if (msg.contains("Trawler's trust")) {
 				// Another message includes the additional fish caught
 				return;

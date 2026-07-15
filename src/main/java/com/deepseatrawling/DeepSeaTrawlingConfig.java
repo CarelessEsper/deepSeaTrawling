@@ -311,6 +311,15 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Notification notifySpecialShoal() { return Notification.ON; }
 
+    @ConfigItem(
+            keyName = "notifyKickedFromNet",
+            name = "Notify when kicked from net",
+            description = "Shows a RuneLite notification when you are removed from the trawling net due to inactivity",
+            position = 5,
+            section = notifSection
+    )
+    default Notification notifyKickedFromNet() { return Notification.ON; }
+
     // -------------- Colours ---------------------
     @Alpha
     @ConfigItem(
