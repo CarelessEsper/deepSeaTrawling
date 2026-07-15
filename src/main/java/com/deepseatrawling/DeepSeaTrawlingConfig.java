@@ -363,6 +363,16 @@ public interface DeepSeaTrawlingConfig extends Config
 
     @Alpha
     @ConfigItem(
+            keyName = "netKickedHighlightColour",
+            name = "Inactive net highlight color",
+            description = "Colour used to highlight the available net after being kicked for inactivity",
+            position = 4,
+            section = coloursSection
+    )
+    default Color netKickedHighlightColour() { return Color.ORANGE; }
+
+    @Alpha
+    @ConfigItem(
             keyName = "shoalPathColour",
             name = "Regular Shoal path solid colour",
             description = "Solid path line colour (used when Path colour mode = SOLID) and NOT special shoal",

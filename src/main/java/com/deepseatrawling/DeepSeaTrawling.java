@@ -85,6 +85,10 @@ public class DeepSeaTrawling extends Plugin
     private boolean notifiedFull = false;
     private boolean pendingInitialLoad = true;
 
+    @Getter
+    public GameObject kickedNetObject = null;
+    private GameObject lastUsedNetObject = null;
+
     private int lastNotifiedDepth = -1;
 
     private Map<Integer, Integer> inventoryFishSnapshot = null;
@@ -539,6 +543,8 @@ public class DeepSeaTrawling extends Plugin
             netCountUnknownFromCargoHold = false;
             unknownHoldCount = 0;
             netCountBeforeCargoHold = 0;
+            kickedNetObject = null;
+            lastUsedNetObject = null;
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
@@ -704,8 +710,9 @@ public class DeepSeaTrawling extends Plugin
                 // Partial inventory collection — onWidgetClosed handles the diff
             }
 
-            if (msg.equals("Your hands grow numb from holding the net")) {
-                notifier.notify(config.notifyKickedFromNet(), "You were removed from the trawling net due to inactivity!");
+            if (msg.startsWith("Your hands grow numb from holding the net in place for a long time without moving")) {
+                notifier.notify(config.notifyKickedFromNet(), "[Deep Sea Trawling] You were removed from the trawling net due to inactivity!");
+                kickedNetObject = lastUsedNetObject;
                 return;
             }
 
@@ -781,6 +788,19 @@ public class DeepSeaTrawling extends Plugin
 
 		switch (changed)
 		{
+			case VarbitID.SAILING_FACILITY_HOTSPOT_NUMBER:
+				if (e.getValue() != 0) {
+					int hotspotId = e.getValue();
+					if (hotspotId == client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID)
+							&& netObjectByIndex[0] != null) {
+						lastUsedNetObject = netObjectByIndex[0];
+					} else if (hotspotId == client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID)
+							&& netObjectByIndex[1] != null) {
+						lastUsedNetObject = netObjectByIndex[1];
+					}
+					kickedNetObject = null;
+				}
+				break;
 			case VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT:
 				if (e.getValue() == 1) {
 					wasOnBoat = true; // Track this to avoid wipes during login state change
@@ -793,6 +813,8 @@ public class DeepSeaTrawling extends Plugin
 					netCountUnknownFromCargoHold = false;
 					unknownHoldCount = 0;
 					netCountBeforeCargoHold = 0;
+					kickedNetObject = null;
+					lastUsedNetObject = null;
 					log.debug("Disembarked from boat - clearing fish counts");
 
 					// Report trip summary before clearing

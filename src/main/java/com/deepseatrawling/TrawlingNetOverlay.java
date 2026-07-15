@@ -29,6 +29,11 @@ public class TrawlingNetOverlay extends Overlay {
 
     @Override
     public Dimension render(Graphics2D graphics) {
+        GameObject kickedNet = plugin.kickedNetObject;
+        if (kickedNet != null) {
+            renderKickedNetHighlight(graphics, kickedNet);
+        }
+
         if (!config.highlightFullNets() && !config.highlightWrongDepthNets()) {
             return null;
         }
@@ -113,5 +118,28 @@ public class TrawlingNetOverlay extends Overlay {
             OverlayUtil.renderPolygon(graphic, netShape, config.netDepthHighlightColour());
         }
 
+    }
+
+    private void renderKickedNetHighlight(Graphics2D graphics, GameObject netObject) {
+        Shape netShape = null;
+        switch (config.netHighlightStyle()) {
+            case CLICKBOX:
+                netShape = netObject.getClickbox();
+                break;
+            case HULL_FILL:
+            case OUTLINE:
+                netShape = netObject.getConvexHull();
+                break;
+        }
+        if (netShape == null) {
+            return;
+        }
+
+        Color kickColour = config.netKickedHighlightColour();
+        if (config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.HULL_FILL) {
+            graphics.setColor(new Color(kickColour.getRed(), kickColour.getGreen(), kickColour.getBlue(), 60));
+            graphics.fill(netShape);
+        }
+        OverlayUtil.renderPolygon(graphics, netShape, kickColour);
     }
 }
