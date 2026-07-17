@@ -4,10 +4,12 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameObject;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.Notifier;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -21,6 +23,12 @@ public class NetActivityTracker
     @Inject
     private Client client;
 
+    @Inject
+    private DeepSeaTrawlingConfig config;
+
+    @Inject
+    private Notifier notifier;
+
     public final EnumMap<TrawlingNetSide, GameObject> netObjects = new EnumMap<>(TrawlingNetSide.class);
 
     // GameObject of most recently-used net 
@@ -29,6 +37,8 @@ public class NetActivityTracker
 
     @Getter
     private boolean kickHighlightActive = false;
+    private boolean facilitiesReEnabled = false;
+    private Integer lastBoatMoveMode = null;
 
     
     public void onKicked()
@@ -43,6 +53,8 @@ public class NetActivityTracker
         netObjects.clear();
         kickedNetObject = null;
         kickHighlightActive = false;
+        facilitiesReEnabled = false;
+        lastBoatMoveMode = null;
     }
 
     @Subscribe
@@ -71,12 +83,38 @@ public class NetActivityTracker
     }
 
     @Subscribe
+    public void onChatMessage(ChatMessage event)
+    {
+        if (event.getType() != net.runelite.api.ChatMessageType.GAMEMESSAGE) return;
+        String msg = event.getMessage().replaceAll("<[^>]*>", "");
+        if (msg.contains("This boat's facilities have been enabled again"))
+        {
+            facilitiesReEnabled = true;
+        }
+    }
+
+    @Subscribe
     public void onVarbitChanged(VarbitChanged e)
     {
         // clear highlight when the player starts using any facility
         if (e.getVarbitId() == VarbitID.SAILING_BOAT_FACILITY_LOCKEDIN && e.getValue() != 0)
         {
             kickHighlightActive = false;
+        }
+
+        if (e.getVarbitId() == VarbitID.SAILING_SIDEPANEL_BOAT_MOVE_MODE)
+        {
+            int newMode = e.getValue();
+            if (lastBoatMoveMode != null && lastBoatMoveMode == 4 && newMode != 4 && facilitiesReEnabled
+                    && client.getVarbitValue(VarbitID.SAILING_BOAT_FACILITY_LOCKEDIN) == 0)
+            {
+                facilitiesReEnabled = false;
+                if (config.notifyKickedFromNet().isEnabled()) {
+                    kickHighlightActive = true;
+                    notifier.notify(config.notifyKickedFromNet(), "The boat is moving! Operate your net.");
+                }
+            }
+            lastBoatMoveMode = newMode;
         }
 
         if (e.getVarbitId() != VarbitID.SAILING_FACILITY_HOTSPOT_NUMBER) return;
@@ -86,10 +124,10 @@ public class NetActivityTracker
         int net0Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID);
         int net1Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID);
 
-        if (hotspotId == net0Hotspot) {
+        if (net0Hotspot != 0 && hotspotId == net0Hotspot) {
             GameObject net = netObjects.get(TrawlingNetSide.STARBOARD);
             if (net != null) kickedNetObject = net;
-        } else if (hotspotId == net1Hotspot) {
+        } else if (net1Hotspot != 0 && hotspotId == net1Hotspot) {
             GameObject net = netObjects.get(TrawlingNetSide.PORT);
             if (net != null) kickedNetObject = net;
         }
@@ -106,10 +144,10 @@ public class NetActivityTracker
         currentHotspot = currentHotspot - 1;
         int net0Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID);
         int net1Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID);
-        if (currentHotspot == net0Hotspot) {
+        if (net0Hotspot != 0 && currentHotspot == net0Hotspot) {
             GameObject net = netObjects.get(TrawlingNetSide.STARBOARD);
             if (net != null) kickedNetObject = net;
-        } else if (currentHotspot == net1Hotspot) {
+        } else if (net1Hotspot != 0 && currentHotspot == net1Hotspot) {
             GameObject net = netObjects.get(TrawlingNetSide.PORT);
             if (net != null) kickedNetObject = net;
         }

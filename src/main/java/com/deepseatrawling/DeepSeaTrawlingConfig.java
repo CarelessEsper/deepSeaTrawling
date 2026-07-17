@@ -314,7 +314,7 @@ public interface DeepSeaTrawlingConfig extends Config
     @ConfigItem(
             keyName = "notifyKickedFromNet",
             name = "Notify when kicked from net",
-            description = "Shows a RuneLite notification when you are removed from the trawling net due to inactivity",
+            description = "Shows a RuneLite notification when you are removed from the trawling net (either for inactivity or the captain disembarking).",
             position = 5,
             section = notifSection
     )
@@ -365,7 +365,7 @@ public interface DeepSeaTrawlingConfig extends Config
     @ConfigItem(
             keyName = "netKickedHighlightColour",
             name = "Inactive net highlight color",
-            description = "Colour used to highlight the available net after being kicked for inactivity",
+            description = "Colour used to highlight the net after being removed from the facility",
             position = 4,
             section = coloursSection
     )
