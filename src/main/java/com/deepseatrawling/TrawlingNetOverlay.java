@@ -15,23 +15,24 @@ public class TrawlingNetOverlay extends Overlay {
 
     private final Client client;
     private final DeepSeaTrawling plugin;
+    private final NetActivityTracker netTracker;
 
     @Inject
     DeepSeaTrawlingConfig config;
 
     @Inject
-    private TrawlingNetOverlay(Client client, DeepSeaTrawling plugin) {
+    private TrawlingNetOverlay(Client client, DeepSeaTrawling plugin, NetActivityTracker netTracker) {
         this.client = client;
         this.plugin = plugin;
+        this.netTracker = netTracker;
         setPosition(OverlayPosition.DYNAMIC);
         setLayer(OverlayLayer.ABOVE_SCENE);
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        GameObject kickedNet = plugin.kickedNetObject;
-        if (kickedNet != null) {
-            renderKickedNetHighlight(graphics, kickedNet);
+        if (netTracker.isKickHighlightActive() && netTracker.getKickedNetObject() != null) {
+            renderKickedNetHighlight(graphics, netTracker.getKickedNetObject());
         }
 
         if (!config.highlightFullNets() && !config.highlightWrongDepthNets()) {
@@ -67,12 +68,12 @@ public class TrawlingNetOverlay extends Overlay {
             return null;
         }
 
-        for (int netIndex = 0; netIndex <= 1; netIndex++)
+        for (TrawlingNetSide side : TrawlingNetSide.values())
         {
-            GameObject netObj = plugin.netObjectByIndex[netIndex];
+            GameObject netObj = netTracker.netObjects.get(side);
             if (netObj == null) continue;
 
-            Net net = plugin.netList[netIndex];
+            Net net = plugin.netList[side.ordinal()];
             if (net == null) continue;
 
             if (config.highlightFullNets() && plugin.fishQuantity >= totalNetSize)

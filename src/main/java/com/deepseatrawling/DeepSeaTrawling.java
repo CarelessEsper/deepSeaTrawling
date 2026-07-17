@@ -10,7 +10,6 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
 import net.runelite.api.gameval.NpcID;
-import net.runelite.api.gameval.ObjectID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.Notifier;
@@ -81,13 +80,15 @@ public class DeepSeaTrawling extends Plugin
     private Notifier notifier;
 
     @Inject
+    private net.runelite.client.eventbus.EventBus eventBus;
+
+    @Inject
     private net.runelite.client.callback.ClientThread clientThread;
     private boolean notifiedFull = false;
     private boolean pendingInitialLoad = true;
 
-    @Getter
-    public GameObject kickedNetObject = null;
-    private GameObject lastUsedNetObject = null;
+    @Inject
+    private NetActivityTracker netTracker;
 
     private int lastNotifiedDepth = -1;
 
@@ -149,6 +150,7 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.add(overlay);
 		overlayManager.add(widgetOverlay);
 		overlayManager.add(trawlingNetOverlay);
+		eventBus.register(netTracker);
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/netInfobox_icon.png");
 		trawlingNetInfoBox = new TrawlingNetInfoBox(icon, this, config);
@@ -173,6 +175,8 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.remove(overlay);
 		overlayManager.remove(widgetOverlay);
 		overlayManager.remove(trawlingNetOverlay);
+		eventBus.unregister(netTracker);
+		netTracker.reset();
 
 		if (trawlingNetInfoBox != null) {
 			infoBoxManager.removeInfoBox(trawlingNetInfoBox);
@@ -183,8 +187,6 @@ public class DeepSeaTrawling extends Plugin
 		}
 		fishCatchInfoBoxes.clear();
 		trackedShoals.clear();
-		netObjectByIndex[0] = null;
-		netObjectByIndex[1] = null;
         activeShoals.clear();
         nearestShoal = null;
         collectingFromNet = false;
@@ -201,7 +203,6 @@ public class DeepSeaTrawling extends Plugin
             59755, 59756, 59757, 59758, 59759, 59760, 59761, 59762, 59763, 59764, 59765, 59766
     ));
 
-    public final GameObject[] netObjectByIndex = new GameObject[2];
 
 	public int fishQuantity = 0;
 
@@ -265,18 +266,6 @@ public class DeepSeaTrawling extends Plugin
 
 		int id = obj.getId();
 
-		if (client.getLocalPlayer() != null && client.getLocalPlayer().getWorldView() != null && obj.getWorldView() != null && client.getLocalPlayer().getWorldView() == obj.getWorldView())
-		{
-			if (isStarboardNetObject(id)) {
-				netObjectByIndex[0] = obj;
-				return;
-			}
-
-			if (isPortNetObject(id)) {
-				netObjectByIndex[1] = obj;
-				return;
-			}
-		}
 		ShoalData.ShoalSpecies species = ShoalData.ShoalSpecies.fromGameObjectId(id);
 		if (species == null) {
 			return;
@@ -327,9 +316,6 @@ public class DeepSeaTrawling extends Plugin
 	public void onGameObjectDespawned(GameObjectDespawned event) {
 		GameObject obj = event.getGameObject();
 		if (obj == null) return;
-
-		if (netObjectByIndex[0] == obj) netObjectByIndex[0] = null;
-		if (netObjectByIndex[1] == obj) netObjectByIndex[1] = null;
 
         int worldViewId = obj.getWorldView() != null ? obj.getWorldView().getId() : -1;
         if (worldViewId != -1)
@@ -543,8 +529,7 @@ public class DeepSeaTrawling extends Plugin
             netCountUnknownFromCargoHold = false;
             unknownHoldCount = 0;
             netCountBeforeCargoHold = 0;
-            kickedNetObject = null;
-            lastUsedNetObject = null;
+            netTracker.reset();
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
@@ -712,7 +697,7 @@ public class DeepSeaTrawling extends Plugin
 
             if (msg.startsWith("Your hands grow numb from holding the net in place for a long time without moving")) {
                 notifier.notify(config.notifyKickedFromNet(), "[Deep Sea Trawling] You were removed from the trawling net due to inactivity!");
-                kickedNetObject = lastUsedNetObject;
+                netTracker.onKicked();
                 return;
             }
 
@@ -788,19 +773,6 @@ public class DeepSeaTrawling extends Plugin
 
 		switch (changed)
 		{
-			case VarbitID.SAILING_FACILITY_HOTSPOT_NUMBER:
-				if (e.getValue() != 0) {
-					int hotspotId = e.getValue();
-					if (hotspotId == client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID)
-							&& netObjectByIndex[0] != null) {
-						lastUsedNetObject = netObjectByIndex[0];
-					} else if (hotspotId == client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID)
-							&& netObjectByIndex[1] != null) {
-						lastUsedNetObject = netObjectByIndex[1];
-					}
-					kickedNetObject = null;
-				}
-				break;
 			case VarbitID.SAILING_PLAYER_IS_ON_PLAYER_BOAT:
 				if (e.getValue() == 1) {
 					wasOnBoat = true; // Track this to avoid wipes during login state change
@@ -813,8 +785,7 @@ public class DeepSeaTrawling extends Plugin
 					netCountUnknownFromCargoHold = false;
 					unknownHoldCount = 0;
 					netCountBeforeCargoHold = 0;
-					kickedNetObject = null;
-					lastUsedNetObject = null;
+					netTracker.reset();
 					log.debug("Disembarked from boat - clearing fish counts");
 
 					// Report trip summary before clearing
@@ -948,26 +919,6 @@ public class DeepSeaTrawling extends Plugin
 
 		throw new IllegalArgumentException("Unknown quantity: " + s);
 	}
-	public boolean isPortNetObject(int objectId)
-	{
-		return objectId == ObjectID.SAILING_ROPE_TRAWLING_NET_3X8_PORT
-				|| objectId == ObjectID.SAILING_LINEN_TRAWLING_NET_3X8_PORT
-				|| objectId == ObjectID.SAILING_HEMP_TRAWLING_NET_3X8_PORT
-				|| objectId == ObjectID.SAILING_COTTON_TRAWLING_NET_3X8_PORT;
-	}
-
-	public boolean isStarboardNetObject(int objectId)
-	{
-		return objectId == ObjectID.SAILING_ROPE_TRAWLING_NET_3X8_STARBOARD
-				|| objectId == ObjectID.SAILING_LINEN_TRAWLING_NET_3X8_STARBOARD
-				|| objectId == ObjectID.SAILING_HEMP_TRAWLING_NET_3X8_STARBOARD
-				|| objectId == ObjectID.SAILING_COTTON_TRAWLING_NET_3X8_STARBOARD
-				|| objectId == ObjectID.SAILING_ROPE_TRAWLING_NET
-				|| objectId == ObjectID.SAILING_LINEN_TRAWLING_NET
-				|| objectId == ObjectID.SAILING_HEMP_TRAWLING_NET
-				|| objectId == ObjectID.SAILING_COTTON_TRAWLING_NET;
-	}
-
     private void rebuildShoalColours() {
         speciesColours.clear();
         speciesColours.put(ShoalData.ShoalSpecies.GIANT_KRILL, config.giantKrillColour());
