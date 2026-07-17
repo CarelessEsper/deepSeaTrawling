@@ -311,6 +311,15 @@ public interface DeepSeaTrawlingConfig extends Config
     )
     default Notification notifySpecialShoal() { return Notification.ON; }
 
+    @ConfigItem(
+            keyName = "notifyKickedFromNet",
+            name = "Notify when kicked from net",
+            description = "Shows a RuneLite notification when you are removed from the trawling net (either for inactivity or the captain disembarking).",
+            position = 5,
+            section = notifSection
+    )
+    default Notification notifyKickedFromNet() { return Notification.ON; }
+
     // -------------- Colours ---------------------
     @Alpha
     @ConfigItem(
@@ -351,6 +360,16 @@ public interface DeepSeaTrawlingConfig extends Config
             section = coloursSection
     )
     default Color netFullHighlightColour() { return Color.RED; }
+
+    @Alpha
+    @ConfigItem(
+            keyName = "netKickedHighlightColour",
+            name = "Inactive net highlight color",
+            description = "Colour used to highlight the net after being removed from the facility",
+            position = 4,
+            section = coloursSection
+    )
+    default Color netKickedHighlightColour() { return Color.ORANGE; }
 
     @Alpha
     @ConfigItem(
