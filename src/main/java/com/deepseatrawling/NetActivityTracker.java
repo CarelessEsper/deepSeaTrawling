@@ -106,12 +106,13 @@ public class NetActivityTracker
         {
             int newMode = e.getValue();
             if (lastBoatMoveMode != null && lastBoatMoveMode == 4 && newMode != 4 && facilitiesReEnabled
+                    && kickedNetObject != null
                     && client.getVarbitValue(VarbitID.SAILING_BOAT_FACILITY_LOCKEDIN) == 0)
             {
                 facilitiesReEnabled = false;
                 if (config.notifyKickedFromNet().isEnabled()) {
                     kickHighlightActive = true;
-                    notifier.notify(config.notifyKickedFromNet(), "The boat is moving! Operate your net.");
+                    notifier.notify(config.notifyKickedFromNet(), "The captain is back on board! Operate your net.");
                 }
             }
             lastBoatMoveMode = newMode;
