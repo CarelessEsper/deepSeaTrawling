@@ -696,7 +696,7 @@ public class DeepSeaTrawling extends Plugin
             }
 
             if (msg.startsWith("Your hands grow numb from holding the net in place for a long time without moving")) {
-                notifier.notify(config.notifyKickedFromNet(), "[Deep Sea Trawling] You were removed from the trawling net due to inactivity!");
+                notifier.notify(config.notifyKickedFromNet(), "You were removed from the trawling net due to inactivity!");
                 netTracker.onKicked();
                 return;
             }
