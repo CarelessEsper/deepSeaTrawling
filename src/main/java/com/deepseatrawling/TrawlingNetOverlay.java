@@ -63,11 +63,6 @@ public class TrawlingNetOverlay extends Overlay {
             }
         }
 
-        if (desiredDepth < 1)
-        {
-            return null;
-        }
-
         for (TrawlingNetSide side : TrawlingNetSide.values())
         {
             GameObject netObj = netTracker.netObjects.get(side);
@@ -76,9 +71,14 @@ public class TrawlingNetOverlay extends Overlay {
             Net net = plugin.netList[side.ordinal()];
             if (net == null) continue;
 
-            if (config.highlightFullNets() && plugin.fishQuantity >= totalNetSize)
+            int currentDepth = net.getNetDepthAsInt();
+
+            boolean full = config.highlightFullNets() && plugin.fishQuantity >= totalNetSize;
+            boolean wrongDepth = config.highlightWrongDepthNets() && desiredDepth >= 1 && currentDepth >= 1 && currentDepth != desiredDepth;
+
+            if ( full || wrongDepth )
             {
-                trawlingNetOutline(graphics, plugin.fishQuantity, totalNetSize, netObj);
+                trawlingNetOutline(graphics, full, netObj);
             }
         }
 
@@ -86,7 +86,7 @@ public class TrawlingNetOverlay extends Overlay {
 
     }
 
-    private void trawlingNetOutline(Graphics2D graphic, int fishQuantity, int totalNetSize, GameObject netObject) {
+    private void trawlingNetOutline(Graphics2D graphic, boolean full, GameObject netObject) {
         if (netObject == null) {
             return;
         }
@@ -105,20 +105,14 @@ public class TrawlingNetOverlay extends Overlay {
             return;
         }
 
-        if (fishQuantity >= totalNetSize && config.highlightFullNets()) {
-            if (config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.HULL_FILL) {
-                graphic.setColor(new Color(config.netFullHighlightColour().getRed(), config.netFullHighlightColour().getGreen(),config.netFullHighlightColour().getBlue(), 60));
-                graphic.fill(netShape);
-            }
-            OverlayUtil.renderPolygon(graphic, netShape, config.netFullHighlightColour());
-        } else if (config.highlightWrongDepthNets()) {
-            if (config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.HULL_FILL) {
-                graphic.setColor(new Color(config.netDepthHighlightColour().getRed(), config.netDepthHighlightColour().getGreen(),config.netDepthHighlightColour().getBlue(), 60));
-                graphic.fill(netShape);
-            }
-            OverlayUtil.renderPolygon(graphic, netShape, config.netDepthHighlightColour());
+        Color colour = full ? config.netFullHighlightColour() : config.netDepthHighlightColour();
+
+        if (config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.HULL_FILL) {
+            graphic.setColor(new Color(colour.getRed(), colour.getGreen(),colour.getBlue(), 60));
+            graphic.fill(netShape);
         }
 
+        OverlayUtil.renderPolygon(graphic, netShape, colour);
     }
 
     private void renderKickedNetHighlight(Graphics2D graphics, GameObject netObject) {
