@@ -34,6 +34,7 @@ public class NetActivityTracker
     // GameObject of most recently-used net 
     @Getter
     private GameObject kickedNetObject = null;
+    private TrawlingNetSide lastUsedNetSide = null;
 
     @Getter
     private boolean kickHighlightActive = false;
@@ -52,6 +53,7 @@ public class NetActivityTracker
     {
         netObjects.clear();
         kickedNetObject = null;
+        lastUsedNetSide = null;
         kickHighlightActive = false;
         facilitiesReEnabled = false;
         lastBoatMoveMode = null;
@@ -66,11 +68,10 @@ public class NetActivityTracker
         TrawlingNetSide side = TrawlingNetSide.fromGameObjectId(obj.getId());
         if (side == null) return;
 
-        if (client.getLocalPlayer() == null
-                || client.getLocalPlayer().getWorldView() == null
-                || client.getLocalPlayer().getWorldView() != obj.getWorldView()) return;
-
         netObjects.put(side, obj);
+        if (kickedNetObject == null && side == lastUsedNetSide) {
+            kickedNetObject = obj;
+        }
         backfillLastUsedNet();
     }
 
@@ -126,9 +127,11 @@ public class NetActivityTracker
         int net1Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID);
 
         if (net0Hotspot != 0 && hotspotId == net0Hotspot) {
+            lastUsedNetSide = TrawlingNetSide.STARBOARD;
             GameObject net = netObjects.get(TrawlingNetSide.STARBOARD);
             if (net != null) kickedNetObject = net;
         } else if (net1Hotspot != 0 && hotspotId == net1Hotspot) {
+            lastUsedNetSide = TrawlingNetSide.PORT;
             GameObject net = netObjects.get(TrawlingNetSide.PORT);
             if (net != null) kickedNetObject = net;
         }
@@ -146,9 +149,11 @@ public class NetActivityTracker
         int net0Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_0_HOTSPOT_ID);
         int net1Hotspot = client.getVarbitValue(VarbitID.SAILING_SIDEPANEL_BOAT_TRAWLING_NET_1_HOTSPOT_ID);
         if (net0Hotspot != 0 && currentHotspot == net0Hotspot) {
+            lastUsedNetSide = TrawlingNetSide.STARBOARD;
             GameObject net = netObjects.get(TrawlingNetSide.STARBOARD);
             if (net != null) kickedNetObject = net;
         } else if (net1Hotspot != 0 && currentHotspot == net1Hotspot) {
+            lastUsedNetSide = TrawlingNetSide.PORT;
             GameObject net = netObjects.get(TrawlingNetSide.PORT);
             if (net != null) kickedNetObject = net;
         }
