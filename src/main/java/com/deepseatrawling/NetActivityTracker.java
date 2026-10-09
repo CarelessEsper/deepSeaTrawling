@@ -68,6 +68,11 @@ public class NetActivityTracker
         TrawlingNetSide side = TrawlingNetSide.fromGameObjectId(obj.getId());
         if (side == null) return;
 
+        // Only track nets on the player's own boat
+        if (client.getLocalPlayer() == null
+                || client.getLocalPlayer().getWorldView() == null
+                || client.getLocalPlayer().getWorldView() != obj.getWorldView()) return;
+
         netObjects.put(side, obj);
         if (kickedNetObject == null && side == lastUsedNetSide) {
             kickedNetObject = obj;
