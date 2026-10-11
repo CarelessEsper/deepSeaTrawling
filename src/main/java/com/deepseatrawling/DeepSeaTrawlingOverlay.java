@@ -272,7 +272,7 @@ public class DeepSeaTrawlingOverlay extends Overlay {
 
     private void drawDepthLabel(Graphics2D graphic, ShoalData shoal, int sizeTiles)
     {
-        if (!config.showShoalDepthText() && config.depthTimer() == TimerType.NONE) {
+        if (!config.showShoalDepthText() && config.depthTimer() == TimerType.NONE && !config.showFishCountInShoalBox()) {
             return;
         }
         ShoalData.ShoalDepth depth = shoal.getDepth();
@@ -319,6 +319,7 @@ public class DeepSeaTrawlingOverlay extends Overlay {
         FontMetrics metrics = graphic.getFontMetrics();
 
         java.util.List<String> lines = new ArrayList<>();
+        java.util.List<Color> lineColours = new ArrayList<>();
 
         if (config.showShoalDepthText()) {
             lines.add(depthText);
@@ -349,6 +350,24 @@ public class DeepSeaTrawlingOverlay extends Overlay {
                 }
             }
         }
+
+        // The first line takes the depth colour and the timers are white, as before
+        for (int i = 0; i < lines.size(); i++) {
+            lineColours.add(i == 0 ? textColour : Color.WHITE);
+        }
+
+        if (config.showFishCountInShoalBox()) {
+            int totalNetSize = 0;
+            for (Net net : plugin.netList) {
+                if (net != null) totalNetSize += net.getNetSize();
+            }
+            // One count for all nets: the catch messages do not say which net a fish went into
+            lines.add("Fish: " + plugin.fishQuantity + "/" + totalNetSize);
+            lineColours.add(plugin.fishQuantity >= totalNetSize
+                    ? config.netFullHighlightColour()
+                    : config.fishCounterTextColour());
+        }
+
         if (lines.isEmpty()) {
             return;
         }
@@ -374,8 +393,7 @@ public class DeepSeaTrawlingOverlay extends Overlay {
             int lx = anchorX - (metrics.stringWidth(l) / 2);
             int ly = y - (lineHeight * (lines.size() - 1 - i)); // stack upward
 
-            // color: depth line uses depth colour; timers use white
-            graphic.setColor(i == 0 ? textColour : Color.WHITE);
+            graphic.setColor(lineColours.get(i));
             graphic.drawString(l, lx, ly);
         }
 

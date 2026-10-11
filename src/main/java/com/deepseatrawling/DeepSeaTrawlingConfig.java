@@ -243,6 +243,15 @@ public interface DeepSeaTrawlingConfig extends Config
     default boolean infoboxFishTypeEnabled() { return false; }
 
     @ConfigItem(
+            keyName = "showFishCountInShoalBox",
+            name = "Show fish count with shoal depth",
+            description = "Adds the fish in your nets and their space (for example Fish: 152/250) to the box above the nearest shoal. The count is for all your nets together",
+            position = 8,
+            section = netsSection
+    )
+    default boolean showFishCountInShoalBox() { return false; }
+
+    @ConfigItem(
             keyName = "reportTripTotals",
             name = "Show trip summary on disembark",
             description = "Show a chat message with total fish caught and number collected to inventory when you leave the boat",
