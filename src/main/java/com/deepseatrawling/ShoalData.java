@@ -153,6 +153,11 @@ public class ShoalData {
     @Getter
     private boolean wasMoving;
 
+    /** Whether the shoal has been baited at its current stop. Bait lasts one stop. */
+    @Setter
+    @Getter
+    private boolean baited;
+
     @Getter
     @Setter
     private int movingStreak = 0;

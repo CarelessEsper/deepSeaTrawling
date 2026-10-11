@@ -113,7 +113,11 @@ public class DeepSeaTrawlingOverlay extends Overlay {
             size = 1;
         }
 
-        drawArea(graphics, localLocation, size, baseColour);
+        // An unbaited shoal stands out from the moment it moves on until it is baited at its next stop
+        Color areaColour = config.highlightUnbaitedShoals() && !shoal.isBaited()
+                ? config.unbaitedShoalColour()
+                : baseColour;
+        drawArea(graphics, localLocation, size, areaColour);
 
         drawDepthLabel(graphics, shoal, size);
 

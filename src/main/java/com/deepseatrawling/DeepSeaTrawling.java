@@ -626,6 +626,8 @@ public class DeepSeaTrawling extends Plugin
         {
             shoal.clearStopTimer();
             shoal.setWasMoving(true);
+            // One offcut baits one stop, so the next stop starts unbaited
+            shoal.setBaited(false);
         }
 
         if (shoal.hasActiveStopTimer() && shoal.getTicksUntilMove(client.getTickCount()) <= 0)
@@ -651,7 +653,17 @@ public class DeepSeaTrawling extends Plugin
         if (localPlayer == null || localPlayer.getWorldView() == null) return;
         if (!boats.containsKey(localPlayer.getWorldView().getId())) return;
 
-		if (type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM)
+		// Crewmates' bait lines are game messages but may not be the GAMEMESSAGE type; never player chat
+        if ((type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM
+                || type == ChatMessageType.MESBOX || type == ChatMessageType.ENGINE)
+                && isShoalBaitedMessage(event.getMessage().replaceAll("<[^>]*>", ""))) {
+            if (nearestShoal != null) {
+                nearestShoal.setBaited(true);
+            }
+            return;
+        }
+
+        if (type == ChatMessageType.GAMEMESSAGE || type == ChatMessageType.SPAM)
 		{
             String msg = event.getMessage().replaceAll("<[^>]*>","");
 			if (msg.startsWith("You empty the net") ||
@@ -906,6 +918,14 @@ public class DeepSeaTrawling extends Plugin
 			Map.entry("nine", 9),
 			Map.entry("ten", 10)
 	);
+
+    /**
+     * Whether a game message says a shoal was baited, for example "Jobless Jim has baited a nearby
+     * giant krill shoal with some fish offcuts."
+     */
+    static boolean isShoalBaitedMessage(String msg) {
+        return msg != null && msg.contains(" baited a nearby ") && msg.contains(" shoal");
+    }
 
 	private int convertToNumber(String s)
 	{

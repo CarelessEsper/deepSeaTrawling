@@ -124,6 +124,15 @@ public interface DeepSeaTrawlingConfig extends Config
 	}
 
     @ConfigItem(
+            keyName = "highlightUnbaitedShoals",
+            name = "Colour unbaited shoals",
+            description = "Draws the shoal in the unbaited shoal colour until you or your crew bait it. Bait lasts for one stop, so it turns this colour again when the shoal moves on",
+            position = 6,
+            section = shoalsSection
+    )
+    default boolean highlightUnbaitedShoals() { return false; }
+
+    @ConfigItem(
             keyName = "showDirectionArrows",
             name = "Show direction arrows",
             description = "Draw arrowheads along the path line",
@@ -330,6 +339,16 @@ public interface DeepSeaTrawlingConfig extends Config
             section = coloursSection
     )
     default Color fishCounterTextColour() { return Color.WHITE; }
+
+    @Alpha
+    @ConfigItem(
+            keyName = "unbaitedShoalColour",
+            name = "Unbaited shoal colour",
+            description = "Colour of a shoal that has not been baited at its current or next stop",
+            position = 15,
+            section = coloursSection
+    )
+    default Color unbaitedShoalColour() { return Color.RED; }
 
     @Alpha
     @ConfigItem(
