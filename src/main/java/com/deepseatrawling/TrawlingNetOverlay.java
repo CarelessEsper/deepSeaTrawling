@@ -16,15 +16,17 @@ public class TrawlingNetOverlay extends Overlay {
     private final Client client;
     private final DeepSeaTrawling plugin;
     private final NetActivityTracker netTracker;
+    private final BaitStationTracker baitStationTracker;
 
     @Inject
     DeepSeaTrawlingConfig config;
 
     @Inject
-    private TrawlingNetOverlay(Client client, DeepSeaTrawling plugin, NetActivityTracker netTracker) {
+    private TrawlingNetOverlay(Client client, DeepSeaTrawling plugin, NetActivityTracker netTracker, BaitStationTracker baitStationTracker) {
         this.client = client;
         this.plugin = plugin;
         this.netTracker = netTracker;
+        this.baitStationTracker = baitStationTracker;
         setPosition(OverlayPosition.DYNAMIC);
         setLayer(OverlayLayer.ABOVE_SCENE);
     }
@@ -33,6 +35,10 @@ public class TrawlingNetOverlay extends Overlay {
     public Dimension render(Graphics2D graphics) {
         if (netTracker.isKickHighlightActive() && netTracker.getKickedNetObject() != null) {
             renderKickedNetHighlight(graphics, netTracker.getKickedNetObject());
+        }
+
+        for (GameObject station : baitStationTracker.getUnassignedStations()) {
+            renderHighlight(graphics, station, config.unassignedBaitStationColour());
         }
 
         if (!config.highlightFullNets() && !config.highlightWrongDepthNets()) {
@@ -113,6 +119,22 @@ public class TrawlingNetOverlay extends Overlay {
         }
 
         OverlayUtil.renderPolygon(graphic, netShape, colour);
+    }
+
+    // Draws an object in the chosen net highlight style
+    private void renderHighlight(Graphics2D graphics, GameObject object, Color colour) {
+        Shape shape = config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.CLICKBOX
+                ? object.getClickbox()
+                : object.getConvexHull();
+        if (shape == null) {
+            return;
+        }
+
+        if (config.netHighlightStyle() == DeepSeaTrawlingConfig.NetHighlightStyle.HULL_FILL) {
+            graphics.setColor(new Color(colour.getRed(), colour.getGreen(), colour.getBlue(), 60));
+            graphics.fill(shape);
+        }
+        OverlayUtil.renderPolygon(graphics, shape, colour);
     }
 
     private void renderKickedNetHighlight(Graphics2D graphics, GameObject netObject) {

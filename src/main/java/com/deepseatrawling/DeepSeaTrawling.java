@@ -90,6 +90,9 @@ public class DeepSeaTrawling extends Plugin
     @Inject
     private NetActivityTracker netTracker;
 
+    @Inject
+    private BaitStationTracker baitStationTracker;
+
     private int lastNotifiedDepth = -1;
 
     private Map<Integer, Integer> inventoryFishSnapshot = null;
@@ -151,6 +154,7 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.add(widgetOverlay);
 		overlayManager.add(trawlingNetOverlay);
 		eventBus.register(netTracker);
+		eventBus.register(baitStationTracker);
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/netInfobox_icon.png");
 		trawlingNetInfoBox = new TrawlingNetInfoBox(icon, this, config);
@@ -177,6 +181,8 @@ public class DeepSeaTrawling extends Plugin
 		overlayManager.remove(trawlingNetOverlay);
 		eventBus.unregister(netTracker);
 		netTracker.reset();
+		eventBus.unregister(baitStationTracker);
+		baitStationTracker.reset();
 
 		if (trawlingNetInfoBox != null) {
 			infoBoxManager.removeInfoBox(trawlingNetInfoBox);
@@ -530,6 +536,7 @@ public class DeepSeaTrawling extends Plugin
             unknownHoldCount = 0;
             netCountBeforeCargoHold = 0;
             netTracker.reset();
+            baitStationTracker.reset();
             if (nearestShoal != null) {
                 nearestShoal.setDepth(ShoalData.ShoalDepth.UNKNOWN);
                 nearestShoal.clearStopTimer();
@@ -786,6 +793,7 @@ public class DeepSeaTrawling extends Plugin
 					unknownHoldCount = 0;
 					netCountBeforeCargoHold = 0;
 					netTracker.reset();
+					baitStationTracker.reset();
 					log.debug("Disembarked from boat - clearing fish counts");
 
 					// Report trip summary before clearing

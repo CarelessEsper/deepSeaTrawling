@@ -225,6 +225,15 @@ public interface DeepSeaTrawlingConfig extends Config
     default boolean showShoalDepthText() { return true; }
 
     @ConfigItem(
+            keyName = "highlightUnassignedBaitStation",
+            name = "Highlight unassigned bait station",
+            description = "While your nets are out, highlights your chum station, advanced chum station or chum spreader when no crewmate is assigned to it",
+            position = 9,
+            section = netsSection
+    )
+    default boolean highlightUnassignedBaitStation() { return false; }
+
+    @ConfigItem(
             keyName = "infoboxIsEnabled",
             name = "Show amount of fish in nets",
             description = "Show an infobox with the amount of fish in your nets",
@@ -283,6 +292,15 @@ public interface DeepSeaTrawlingConfig extends Config
             section = notifSection
     )
     default Notification notifyNetFull() { return Notification.ON; }
+
+    @ConfigItem(
+            keyName = "notifyUnassignedBaitStation",
+            name = "Notify when bait station is unassigned",
+            description = "Shows a RuneLite notification when your nets are out and no crewmate is assigned to your chum station, advanced chum station or chum spreader",
+            position = 8,
+            section = notifSection
+    )
+    default Notification notifyUnassignedBaitStation() { return Notification.OFF; }
 
     @ConfigItem(
             keyName = "notifyDepthChange",
@@ -480,5 +498,15 @@ public interface DeepSeaTrawlingConfig extends Config
             section = coloursSection
     )
     default Color vibrantColour() { return new Color(255, 200, 220); }
+
+    @Alpha
+    @ConfigItem(
+            keyName = "unassignedBaitStationColour",
+            name = "Unassigned bait station colour",
+            description = "Colour used to highlight a bait station with no crewmate assigned",
+            position = 14,
+            section = coloursSection
+    )
+    default Color unassignedBaitStationColour() { return Color.YELLOW; }
 
 }
