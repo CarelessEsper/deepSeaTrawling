@@ -6,6 +6,7 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Notification;
+import net.runelite.client.config.Range;
 
 import java.awt.*;
 
@@ -319,6 +320,25 @@ public interface DeepSeaTrawlingConfig extends Config
             section = notifSection
     )
     default Notification notifyKickedFromNet() { return Notification.ON; }
+
+    @ConfigItem(
+            keyName = "notifyNetFishCount",
+            name = "Notify at a fish count",
+            description = "Shows a RuneLite notification when your nets reach the fish count below, before they are full",
+            position = 6,
+            section = notifSection
+    )
+    default Notification notifyNetFishCount() { return Notification.ON; }
+
+    @Range(max = 250)
+    @ConfigItem(
+            keyName = "netFishCountThreshold",
+            name = "Fish count to notify at",
+            description = "The number of fish in your nets that triggers the notification above. 0 turns it off",
+            position = 7,
+            section = notifSection
+    )
+    default int netFishCountThreshold() { return 0; }
 
     // -------------- Colours ---------------------
     @Alpha

@@ -736,6 +736,7 @@ public class DeepSeaTrawling extends Plugin
 
 			if (!quantityStr.isEmpty())
 			{
+                int fishBefore = fishQuantity;
                 int totalNetSize = 0;
                 if (netList[0] != null)
                 {
@@ -761,6 +762,11 @@ public class DeepSeaTrawling extends Plugin
                         notifier.notify(config.notifyNetFull(), "Trawling net(s) full! Empty now!");
                     }
                     notifiedFull = true;
+                }
+                if (reachedFishCountThreshold(fishBefore, fishQuantity, config.netFishCountThreshold(), totalNetSize)
+                        && isNotifyGuardPassed()) {
+                    notifier.notify(config.notifyNetFishCount(),
+                            fishCountMessage(config.netFishCountThreshold(), fishQuantity));
                 }
 			}
 		}
@@ -968,6 +974,30 @@ public class DeepSeaTrawling extends Plugin
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a catch took the nets from below the fish count threshold to at or above it.
+     * Never when the nets are now full, since the full notification covers that, and never
+     * with the threshold at 0 (off). Taking fish out drops the count below the threshold
+     * again, so the next time it is reached notifies again.
+     */
+    static boolean reachedFishCountThreshold(int fishBefore, int fishAfter, int threshold, int totalNetSize) {
+        return threshold > 0
+                && fishBefore < threshold
+                && fishAfter >= threshold
+                && fishAfter < totalNetSize;
+    }
+
+    /**
+     * Catches add several fish at once, so the nets usually pass the chosen count rather than
+     * land on it. Name the chosen count first, so the alert does not look late.
+     */
+    static String fishCountMessage(int threshold, int fishInNets) {
+        if (fishInNets == threshold) {
+            return "Trawling net(s) reached " + threshold + " fish!";
+        }
+        return "Trawling net(s) reached " + threshold + " fish (" + fishInNets + " now)!";
     }
 
     public boolean isNotifyGuardPassed() {
